@@ -74,7 +74,7 @@ test("images show the countdown, title, link kind and details", () => {
   const face = svg(meetingImage(view));
   assert.match(face, /in 12 min/);
   assert.match(face, /AI Platform/);
-  assert.match(face, /Teams ·/);
+  assert.match(face, /Teams \d\d:\d\d/);
   assert.match(svg(detailImage(view)), /Misaki/);
   assert.match(svg(meetingImage({ mode: "none" })), /No more/);
   assert.deepEqual(wrap("a b", 13, 3), ["a b"]);

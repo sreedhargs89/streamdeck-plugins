@@ -51,10 +51,11 @@ export function meetingImage(view, { blink = false } = {}) {
   if (u === "none") return face(COLORS.none, text(["✓"], { y: 66, size: 48 }) + text(["No more", "meetings"], { y: 100, size: 18, weight: 600 }));
   const m = view.meeting;
   const colors = u === "now" && blink ? COLORS.nowOff : COLORS[u];
-  const head = text([countdown(view, fmtTime)], { y: 32, size: u === "now" ? 30 : 21, weight: 800, color: u === "soon" ? "#1a1a1a" : "#fff" });
-  const title = text(wrap(m.subject, 13, 3), { y: 62, size: 17, weight: 700 });
-  const foot = `${m.join ? m.join.kind : "No link"} · ${fmtTime(m.start)}`;
-  return face(colors, head + title + `<rect x="0" y="116" width="144" height="28" fill="#000" fill-opacity=".28"/>` + text([foot], { y: 136, size: 15, weight: 600 }));
+  const label = countdown(view, fmtTime);
+  const head = text([label], { y: 40, size: u === "now" ? 40 : label.length <= 6 ? 34 : label.length <= 8 ? 30 : 25, weight: 800, color: u === "soon" ? "#1a1a1a" : "#fff" });
+  const title = text(wrap(m.subject.replace(/^\[[^\]]*\]\s*/, ""), 11, 2), { y: 74, size: 20, weight: 700 });
+  const foot = `${m.join ? m.join.kind : "No link"} ${fmtTime(m.start)}`;
+  return face(colors, head + title + `<rect x="0" y="112" width="144" height="32" fill="#000" fill-opacity=".3"/>` + text([foot], { y: 135, size: 19, weight: 700 }));
 }
 
 /** Long-press details. */
