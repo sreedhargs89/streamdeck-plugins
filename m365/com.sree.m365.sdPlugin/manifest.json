@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.sree.m365",
+  "Name": "M365 Live",
+  "Version": "1.0.0.0",
+  "Author": "Sree",
+  "Description": "Live Microsoft 365 keys. Next Meeting: countdown, colour by urgency, one press to join.",
+  "Category": "M365 Live",
+  "CategoryIcon": "imgs/category",
+  "Icon": "imgs/plugin",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Nodejs": { "Version": "24", "Debug": "disabled" },
+  "Software": { "MinimumVersion": "7.1" },
+  "OS": [{ "Platform": "mac", "MinimumVersion": "13" }],
+  "Actions": [
+    {
+      "UUID": "com.sree.m365.next-meeting",
+      "Name": "Next Meeting",
+      "Tooltip": "Countdown to your next Outlook meeting. Tap to join (Teams/Zoom), long-press for details.",
+      "Icon": "imgs/next",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": false,
+      "States": [{ "Image": "imgs/next", "ShowTitle": false }]
+    }
+  ]
+}

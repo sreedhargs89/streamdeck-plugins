@@ -1,0 +1,7 @@
+node_modules/
+com.sree.m365.sdPlugin/bin/
+com.sree.m365.sdPlugin/logs/
+preview/
+dist/
+*.streamDeckPlugin
+.DS_Store

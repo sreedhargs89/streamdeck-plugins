@@ -1,0 +1,24 @@
+{
+  "name": "streamdeck-m365",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "M365 Live — Stream Deck plugin: Next Meeting key (Outlook calendar via Microsoft Graph)",
+  "scripts": {
+    "build": "esbuild src/plugin.js --bundle --platform=node --format=esm --target=node24 --outfile=com.sree.m365.sdPlugin/bin/plugin.js \"--banner:js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "images": "swift scripts/make-images.swift",
+    "test": "node --test test/*.test.js",
+    "validate": "streamdeck validate com.sree.m365.sdPlugin",
+    "link": "streamdeck link com.sree.m365.sdPlugin",
+    "reload": "npm run build && (pkill -f 'com.sree.m365.sdPlugin/bin' || true)",
+    "pack": "npm run build && mkdir -p dist && streamdeck pack com.sree.m365.sdPlugin --output dist --force",
+    "login": "node scripts/login.js"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^3.0.2"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.10.2",
+    "esbuild": "^0.25.10"
+  }
+}
