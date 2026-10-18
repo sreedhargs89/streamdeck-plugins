@@ -10,7 +10,7 @@ Personal Elgato Stream Deck plugins (macOS, Stream Deck 7.1+, Node.js 24).
 ## Install on a new Mac
 
 ```bash
-git clone git@gitlab.com:sreedhargs89/streamdeck-plugins.git
+git clone https://github.com/sreedhargs89/streamdeck-plugins.git
 cd streamdeck-plugins/herdr
 npm install
 npm run pack                       # builds dist/com.sree.herdr.streamDeckPlugin
