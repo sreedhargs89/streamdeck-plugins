@@ -1,0 +1,7 @@
+node_modules/
+com.sree.herdr.sdPlugin/bin/
+com.sree.herdr.sdPlugin/logs/
+preview/
+dist/
+*.streamDeckPlugin
+.DS_Store

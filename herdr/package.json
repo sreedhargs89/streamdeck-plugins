@@ -1,0 +1,26 @@
+{
+  "name": "streamdeck-herdr",
+  "version": "1.0.0",
+  "description": "herdr Live \u2014 Stream Deck plugin with live, self-syncing herdr tab tiles",
+  "scripts": {
+    "build": "esbuild src/plugin.js --bundle --platform=node --format=esm --target=node24 --outfile=com.sree.herdr.sdPlugin/bin/plugin.js \"--banner:js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "images": "swift scripts/make-images.swift",
+    "validate": "streamdeck validate com.sree.herdr.sdPlugin",
+    "link": "streamdeck link com.sree.herdr.sdPlugin",
+    "test": "node --test test/*.test.js",
+    "reload": "npm run build && (pkill -f 'streamdeck-herdr/com.sree.herdr.sdPlugin/bin' || true)",
+    "pack": "npm run build && mkdir -p dist && streamdeck pack com.sree.herdr.sdPlugin --output dist --force",
+    "install-folder": "node scripts/install-folder.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@elgato/streamdeck": "^3.0.2"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.10.2",
+    "esbuild": "^0.25.10"
+  },
+  "private": true
+}
