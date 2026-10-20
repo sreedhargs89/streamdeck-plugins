@@ -15,6 +15,7 @@ const state = {
   page: 0,
   prevStatus: new Map(), // tab id -> last status, to detect working -> done
   flashUntil: new Map(), // tab id -> timestamp
+  doneSince: new Map(), // tab id -> when it turned "done" (for "DONE · 2m")
   needsCursor: null, // last tab id the Needs-me key jumped to
 };
 
@@ -44,7 +45,7 @@ function renderKey(k, now = Date.now()) {
     if (k.peekUntil > now) return paint(k, peekImage(tab));
     const flashing = tab && (state.flashUntil.get(tab.id) ?? 0) > now;
     const on = flashing && Math.floor(now / 500) % 2 === 0;
-    return paint(k, slotImage(tab, { flash: on }));
+    return paint(k, slotImage(tab, { flash: on, doneSince: tab && state.doneSince.get(tab.id), now }));
   }
   if (k.kind === "needs") {
     const waiting = state.tabs.filter((t) => WAITING.has(t.status));
@@ -79,10 +80,13 @@ async function poll() {
     for (const t of tabs) {
       const before = state.prevStatus.get(t.id);
       if (before === "working" && WAITING.has(t.status)) state.flashUntil.set(t.id, now + FLASH_MS);
+      if (t.status === "done" && before !== undefined && before !== "done") state.doneSince.set(t.id, now);
+      if (t.status !== "done") state.doneSince.delete(t.id);
       state.prevStatus.set(t.id, t.status);
     }
     const live = new Set(tabs.map((t) => t.id));
     for (const id of state.prevStatus.keys()) if (!live.has(id)) state.prevStatus.delete(id);
+    for (const id of state.doneSince.keys()) if (!live.has(id)) state.doneSince.delete(id);
     if (state.online !== true || tabs.length !== state.tabs.length) streamDeck.logger.info(`herdr online: ${tabs.length} tabs`);
     state.tabs = tabs;
     state.online = true;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { wrap, themeFor, displayName, slotImage, needsImage, moreImage, peekImage } from "../src/render.js";
+import { wrap, themeFor, displayName, doneLabel, slotImage, needsImage, moreImage, peekImage } from "../src/render.js";
 import { snapshot } from "../src/herdr.js";
 
 const svg = (u) => decodeURIComponent(u.replace(/^data:image\/svg\+xml;charset=utf8,/, ""));
@@ -40,10 +40,26 @@ test("themes map known tabs to groups", () => {
 
 test("slot image shows status colour, focus ring and escapes labels", () => {
   const s = svg(slotImage({ label: "a<b>&c", status: "blocked", focused: true }));
-  assert.match(s, /#FF1744/);
-  assert.match(s, /stroke-width="5"/);
+  assert.match(s, /#FF9100/);
+  assert.match(s, /NEEDS YOU/);
+  assert.match(s, /stroke-dasharray/);
   assert.match(s, /A&lt;b&gt;&amp;c/);
   assert.doesNotMatch(svg(slotImage(undefined)), /<text/);
+});
+
+test("status tiles share one base colour and differ by frame + label", () => {
+  const run = svg(slotImage({ label: "AI Platform", status: "working" }));
+  assert.match(run, /#300a24/);
+  assert.match(run, /#00E676/);
+  assert.match(run, /RUNNING/);
+  const idle = svg(slotImage({ label: "AI Platform", status: "idle" }));
+  assert.match(idle, /#300a24/);
+  assert.match(idle, />idle</);
+  assert.doesNotMatch(idle, /stroke-width="7"/);
+  const now = Date.parse("2026-10-20T10:00:00Z");
+  assert.match(svg(slotImage({ label: "x", status: "done" }, { doneSince: now - 125_000, now })), /DONE · 2m/);
+  assert.equal(doneLabel(0), "DONE");
+  assert.equal(doneLabel(now - 2 * 3600_000, now), "DONE · 2h");
 });
 
 test("needs / more / peek images reflect counts", () => {

@@ -17,12 +17,7 @@ function emoji(name) {
 }
 
 const GROUPS = {
-  ops: ["#0B4F8A", "#1E88E5"],
-  avyukt: ["#4A148C", "#8E24AA"],
-  personal: ["#1B5E20", "#43A047"],
-  other: ["#004D40", "#00897B"],
   empty: ["#101316", "#15191d"],
-  flash: ["#F9A825", "#FFEE58"],
 };
 
 // first match wins: [pattern, emoji file, group]
@@ -61,7 +56,21 @@ export function themeFor(label) {
   return { emoji: null, group: "other" };
 }
 
-const DOT = { working: "#00E676", done: "#FFD600", blocked: "#FF1744", idle: "#90A4AE", unknown: "#546E7A" };
+// One base colour for every tile (Ghostty's background); the status shows as a coloured frame + label strip.
+const BASE = ["#300a24", "#4a1438"];
+const STATUS = {
+  working: { color: "#00E676", label: "RUNNING" },
+  done: { color: "#40C4FF", label: "DONE" },
+  blocked: { color: "#FF9100", label: "NEEDS YOU" },
+};
+const IDLE_TEXT = "#9E8A99";
+
+/** "DONE · 2m" style age for a finished tab; plain "DONE" when we never saw it finish. */
+export function doneLabel(since, now = Date.now()) {
+  if (!since) return "DONE";
+  const m = Math.floor((now - since) / 60_000);
+  return `DONE · ${m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`}`;
+}
 
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -97,19 +106,25 @@ function textLines(lines, { y, size, color = "#fff", weight = 700, gap = 1.15 })
 
 const uri = (svg) => `data:image/svg+xml;charset=utf8,${encodeURIComponent(svg)}`;
 
-export function slotImage(tab, { flash = false } = {}) {
+export function slotImage(tab, { flash = false, doneSince = 0, now = Date.now() } = {}) {
   if (!tab) return uri(frame(GROUPS.empty, ""));
-  const t = themeFor(tab.label);
+  const st = STATUS[tab.status];
   const lines = wrap(displayName(tab.label), 11, 2);
-  const img = emoji(t.emoji);
+  const img = emoji(themeFor(tab.label).emoji);
+  const two = lines.length > 1;
   const icon = img
-    ? `<image x="44" y="${lines.length > 1 ? 14 : 22}" width="56" height="56" xlink:href="${img}" href="${img}"/>`
-    : textLines([">_"], { y: lines.length > 1 ? 62 : 70, size: 40, weight: 800 });
-  const ty = lines.length > 1 ? 100 : 112;
-  const dot = `<circle cx="122" cy="22" r="12" fill="${DOT[tab.status] ?? DOT.unknown}" stroke="#000" stroke-opacity=".45" stroke-width="3"/>`;
-  const focus = tab.focused ? `<rect x="3" y="3" width="138" height="138" rx="10" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="5"/>` : "";
-  const textColor = flash ? "#212121" : "#fff";
-  return uri(frame(flash ? GROUPS.flash : GROUPS[t.group], icon + textLines(lines, { y: ty, size: 22, color: textColor }) + dot, focus));
+    ? `<image x="47" y="${two ? 8 : 14}" width="50" height="50" xlink:href="${img}" href="${img}"/>`
+    : textLines([">_"], { y: two ? 50 : 56, size: 36, weight: 800 });
+  const ink = flash ? "#111" : "#fff";
+  const name = textLines(lines, { y: two ? 82 : 92, size: 20, color: ink });
+  const label = st ? (tab.status === "done" ? doneLabel(doneSince, now) : st.label) : "idle";
+  const strip =
+    `<rect x="0" y="116" width="144" height="28" fill="${st ? st.color : "#000"}" fill-opacity="${st ? 1 : 0.25}"/>` +
+    textLines([label], { y: 136, size: 16, weight: 800, color: st ? "#111" : IDLE_TEXT });
+  const border = st ? `<rect x="3.5" y="3.5" width="137" height="137" rx="12" fill="none" stroke="${st.color}" stroke-width="7"/>` : "";
+  const focus = tab.focused ? `<rect x="10" y="10" width="124" height="104" rx="8" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3" stroke-dasharray="9 6"/>` : "";
+  const bg = flash && st ? [st.color, st.color] : BASE;
+  return uri(frame(bg, icon + name + strip + focus, border));
 }
 
 export function peekImage(tab) {
