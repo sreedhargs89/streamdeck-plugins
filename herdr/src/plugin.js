@@ -1,12 +1,13 @@
 import streamDeck, { SingletonAction } from "@elgato/streamdeck";
 import { writeFile, mkdir } from "node:fs/promises";
-import { snapshot, focusTab } from "./herdr.js";
+import { snapshot, focusTab, config } from "./herdr.js";
 import { slotImage, peekImage, needsImage, moreImage, messageImage } from "./render.js";
 
 const POLL_MS = 1500;
 const LONG_PRESS_MS = 450;
 const PEEK_MS = 3500;
 const FLASH_MS = 6000;
+const RECENT_MS = 10 * 60_000; // a finished tab you were already looking at stays blue this long
 const WAITING = new Set(["done", "blocked"]);
 
 const state = {
@@ -41,11 +42,13 @@ function renderKey(k, now = Date.now()) {
     return paint(k, messageImage(k.kind === "slot" && k.slot !== 1 ? [] : ["herdr", "offline"]));
   }
   if (k.kind === "slot") {
-    const tab = tabForSlot(k.slot);
+    const raw = tabForSlot(k.slot);
+    // herdr marks a tab you're looking at "idle" when it finishes; show it as just-done anyway
+    const tab = raw && raw.status === "idle" && state.doneSince.has(raw.id) ? { ...raw, status: "done" } : raw;
     if (k.peekUntil > now) return paint(k, peekImage(tab));
     const flashing = tab && (state.flashUntil.get(tab.id) ?? 0) > now;
     const on = flashing && Math.floor(now / 500) % 2 === 0;
-    return paint(k, slotImage(tab, { flash: on, doneSince: tab && state.doneSince.get(tab.id), now }));
+    return paint(k, slotImage(tab, { flash: on, doneSince: tab && state.doneSince.get(tab.id), now, style: config.style, pulse: Math.floor(now / 1000) % 2 }));
   }
   if (k.kind === "needs") {
     const waiting = state.tabs.filter((t) => WAITING.has(t.status));
@@ -79,9 +82,12 @@ async function poll() {
     const now = Date.now();
     for (const t of tabs) {
       const before = state.prevStatus.get(t.id);
-      if (before === "working" && WAITING.has(t.status)) state.flashUntil.set(t.id, now + FLASH_MS);
-      if (t.status === "done" && before !== undefined && before !== "done") state.doneSince.set(t.id, now);
-      if (t.status !== "done") state.doneSince.delete(t.id);
+      const finished = before === "working" && (t.status === "done" || t.status === "idle");
+      if (finished || (before === "working" && t.status === "blocked")) state.flashUntil.set(t.id, now + FLASH_MS);
+      if (finished || (t.status === "done" && before !== undefined && before !== "done" && !state.doneSince.has(t.id))) state.doneSince.set(t.id, now);
+      const since = state.doneSince.get(t.id);
+      const stale = t.status === "idle" && since && now - since > RECENT_MS;
+      if (t.status === "working" || t.status === "blocked" || stale || (t.status === "idle" && !since)) state.doneSince.delete(t.id);
       state.prevStatus.set(t.id, t.status);
     }
     const live = new Set(tabs.map((t) => t.id));
@@ -107,6 +113,7 @@ async function jump(tab, action) {
   try {
     await focusTab(tab.id);
     state.flashUntil.delete(tab.id);
+    if (tab.status === "idle") state.doneSince.delete(tab.id); // seen it: back to normal
     poll();
   } catch (e) {
     streamDeck.logger.error(`focus ${tab.id} failed: ${e.message}`);
@@ -194,7 +201,7 @@ setInterval(poll, POLL_MS);
 // drive the flash animation between polls
 setInterval(() => {
   const now = Date.now();
-  if ([...state.flashUntil.values()].some((t) => t > now)) renderAll();
+  if ([...state.flashUntil.values()].some((t) => t > now) || state.tabs.some((t) => t.status === "working")) renderAll();
 }, 500);
 
 streamDeck.connect();

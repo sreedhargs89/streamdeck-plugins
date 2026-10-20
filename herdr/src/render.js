@@ -59,17 +59,17 @@ export function themeFor(label) {
 // One base colour for every tile (Ghostty's background); the status shows as a coloured frame + label strip.
 const BASE = ["#300a24", "#4a1438"];
 const STATUS = {
-  working: { color: "#00E676", label: "RUNNING" },
-  done: { color: "#40C4FF", label: "DONE" },
-  blocked: { color: "#FF9100", label: "NEEDS YOU" },
+  working: { color: "#40C4FF", dim: "#1565C0", tint: ["#0a2d4a", "#0d47a1"], pulse: ["#0d47a1", "#1976D2"], text: "#B3E5FC", label: "RUNNING" },
+  done: { color: "#00E676", tint: ["#0d3b1e", "#1b5e20"], text: "#B9F6CA", label: "✓ DONE" },
+  blocked: { color: "#FF1744", tint: ["#4a0d0d", "#b71c1c"], text: "#FFE0E0", label: "NEEDS YOU" },
 };
 const IDLE_TEXT = "#9E8A99";
 
 /** "DONE · 2m" style age for a finished tab; plain "DONE" when we never saw it finish. */
 export function doneLabel(since, now = Date.now()) {
-  if (!since) return "DONE";
+  if (!since) return "✓ DONE";
   const m = Math.floor((now - since) / 60_000);
-  return `DONE · ${m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`}`;
+  return `✓ DONE · ${m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`}`;
 }
 
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -106,8 +106,10 @@ function textLines(lines, { y, size, color = "#fff", weight = 700, gap = 1.15 })
 
 const uri = (svg) => `data:image/svg+xml;charset=utf8,${encodeURIComponent(svg)}`;
 
-export function slotImage(tab, { flash = false, doneSince = 0, now = Date.now() } = {}) {
+/** `pulse` (0/1) breathes running tiles so you can see they're alive. */
+export function slotImage(tab, { flash = false, doneSince = 0, now = Date.now(), style = "tint", pulse = 0 } = {}) {
   if (!tab) return uri(frame(GROUPS.empty, ""));
+  if (style === "tint") return tintImage(tab, { flash, doneSince, now, pulse });
   const st = STATUS[tab.status];
   const lines = wrap(displayName(tab.label), 11, 2);
   const img = emoji(themeFor(tab.label).emoji);
@@ -121,10 +123,29 @@ export function slotImage(tab, { flash = false, doneSince = 0, now = Date.now() 
   const strip =
     `<rect x="0" y="116" width="144" height="28" fill="${st ? st.color : "#000"}" fill-opacity="${st ? 1 : 0.25}"/>` +
     textLines([label], { y: 136, size: 16, weight: 800, color: st ? "#111" : IDLE_TEXT });
-  const border = st ? `<rect x="3.5" y="3.5" width="137" height="137" rx="12" fill="none" stroke="${st.color}" stroke-width="7"/>` : "";
+  const edge = st?.dim && pulse ? st.dim : st?.color;
+  const border = st ? `<rect x="3.5" y="3.5" width="137" height="137" rx="12" fill="none" stroke="${edge}" stroke-width="7"/>` : "";
   const focus = tab.focused ? `<rect x="10" y="10" width="124" height="104" rx="8" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3" stroke-dasharray="9 6"/>` : "";
   const bg = flash && st ? [st.color, st.color] : BASE;
   return uri(frame(bg, icon + name + strip + focus, border));
+}
+
+/** Style "tint": the whole tile takes the status colour, small status label on top; idle stays aubergine. */
+function tintImage(tab, { flash, doneSince, now, pulse }) {
+  const st = STATUS[tab.status];
+  const lines = wrap(displayName(tab.label), 11, 2);
+  const img = emoji(themeFor(tab.label).emoji);
+  const two = lines.length > 1;
+  const iy = two ? 26 : 34;
+  const icon = img
+    ? `<image x="49" y="${iy}" width="46" height="46" xlink:href="${img}" href="${img}"/>`
+    : textLines([">_"], { y: iy + 36, size: 34, weight: 800 });
+  const ink = flash ? "#111" : "#fff";
+  const label = st ? textLines([tab.status === "done" ? doneLabel(doneSince, now) : st.label], { y: 21, size: 14, weight: 800, color: flash ? "#111" : st.text }) : "";
+  const name = textLines(lines, { y: two ? 98 : 106, size: 20, color: ink });
+  const focus = tab.focused ? `<rect x="4" y="4" width="136" height="136" rx="12" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="3" stroke-dasharray="9 6"/>` : "";
+  const bg = st ? (flash ? [st.color, st.color] : st.pulse && pulse ? st.pulse : st.tint) : BASE;
+  return uri(frame(bg, label + icon + name + focus));
 }
 
 export function peekImage(tab) {

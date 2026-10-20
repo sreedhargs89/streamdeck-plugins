@@ -40,7 +40,7 @@ test("themes map known tabs to groups", () => {
 
 test("slot image shows status colour, focus ring and escapes labels", () => {
   const s = svg(slotImage({ label: "a<b>&c", status: "blocked", focused: true }));
-  assert.match(s, /#FF9100/);
+  assert.match(s, /#FF1744/);
   assert.match(s, /NEEDS YOU/);
   assert.match(s, /stroke-dasharray/);
   assert.match(s, /A&lt;b&gt;&amp;c/);
@@ -50,16 +50,28 @@ test("slot image shows status colour, focus ring and escapes labels", () => {
 test("status tiles share one base colour and differ by frame + label", () => {
   const run = svg(slotImage({ label: "AI Platform", status: "working" }));
   assert.match(run, /#300a24/);
-  assert.match(run, /#00E676/);
+  assert.match(run, /#40C4FF/);
+  assert.match(svg(slotImage({ label: "AI Platform", status: "working" }, { pulse: 1 })), /#1565C0/);
   assert.match(run, /RUNNING/);
   const idle = svg(slotImage({ label: "AI Platform", status: "idle" }));
   assert.match(idle, /#300a24/);
   assert.match(idle, />idle</);
   assert.doesNotMatch(idle, /stroke-width="7"/);
   const now = Date.parse("2026-10-20T10:00:00Z");
-  assert.match(svg(slotImage({ label: "x", status: "done" }, { doneSince: now - 125_000, now })), /DONE · 2m/);
-  assert.equal(doneLabel(0), "DONE");
-  assert.equal(doneLabel(now - 2 * 3600_000, now), "DONE · 2h");
+  const done = svg(slotImage({ label: "x", status: "done" }, { doneSince: now - 125_000, now }));
+  assert.match(done, /✓ DONE · 2m/);
+  assert.match(done, /#00E676/);
+  assert.equal(doneLabel(0), "✓ DONE");
+  assert.equal(doneLabel(now - 2 * 3600_000, now), "✓ DONE · 2h");
+});
+
+test("tint style colours the whole tile by status", () => {
+  const run = svg(slotImage({ label: "AI Platform", status: "working" }, { style: "tint" }));
+  assert.match(run, /#0a2d4a/);
+  assert.match(run, /RUNNING/);
+  const idle = svg(slotImage({ label: "AI Platform", status: "idle" }, { style: "tint" }));
+  assert.match(idle, /#300a24/);
+  assert.doesNotMatch(idle, /RUNNING|NEEDS/);
 });
 
 test("needs / more / peek images reflect counts", () => {

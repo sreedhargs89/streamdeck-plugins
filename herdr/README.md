@@ -40,9 +40,14 @@ node scripts/preview.js > preview/deck.svg   # render the folder from live herdr
 Optional `~/.config/streamdeck-herdr.json`:
 
 ```json
-{ "terminal": "iTerm", "herdr": "/opt/homebrew/bin/herdr" }
+{ "terminal": "iTerm", "herdr": "/opt/homebrew/bin/herdr", "style": "frame" }
 ```
 
-Defaults: terminal `Ghostty`; herdr found in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin`.
+Defaults: terminal `Ghostty`; herdr found in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin`; style `tint`.
 
-Icons and colours come from tab names — edit `THEMES` / `ALIASES` in `src/render.js`.
+Tile colours show the agent status: **blue (pulsing) = running**, **green ✓ = done** (with time since,
+also when you were already in that tab: stays green 10 min or until pressed), **red = needs you**, aubergine = idle.
+`"style": "tint"` colours the whole tile; `"frame"` keeps tiles aubergine with a coloured border + label strip.
+Restart the plugin after changing the config.
+
+Icons come from tab names — edit `THEMES` / `ALIASES` in `src/render.js`.

@@ -23,10 +23,11 @@ export function loadConfig(home = homedir(), env = process.env) {
   return {
     herdr: candidates.find((p) => p && existsSync(p)) ?? "herdr",
     terminal: env.HERDR_TERMINAL || file.terminal || "Ghostty",
+    style: env.HERDR_STYLE || file.style || "tint", // tile style: "tint" (whole tile) or "frame" (border + strip)
   };
 }
 
-const config = loadConfig();
+export const config = loadConfig();
 const HERDR = config.herdr;
 
 function run(bin, args, timeout = 3000) {
