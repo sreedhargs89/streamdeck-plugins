@@ -39,7 +39,7 @@ test("themes map known tabs to groups", () => {
 });
 
 test("slot image shows status colour, focus ring and escapes labels", () => {
-  const s = svg(slotImage({ label: "a<b>&c", status: "blocked", focused: true }));
+  const s = svg(slotImage({ label: "a<b>&c", status: "blocked", focused: true }, { style: "frame" }));
   assert.match(s, /#FF1744/);
   assert.match(s, /NEEDS YOU/);
   assert.match(s, /stroke-dasharray/);
@@ -48,17 +48,17 @@ test("slot image shows status colour, focus ring and escapes labels", () => {
 });
 
 test("status tiles share one base colour and differ by frame + label", () => {
-  const run = svg(slotImage({ label: "AI Platform", status: "working" }));
+  const run = svg(slotImage({ label: "AI Platform", status: "working" }, { style: "frame" }));
   assert.match(run, /#300a24/);
   assert.match(run, /#40C4FF/);
-  assert.match(svg(slotImage({ label: "AI Platform", status: "working" }, { pulse: 1 })), /#1565C0/);
+  assert.match(svg(slotImage({ label: "AI Platform", status: "working" }, { style: "frame", pulse: 1 })), /#1565C0/);
   assert.match(run, /RUNNING/);
-  const idle = svg(slotImage({ label: "AI Platform", status: "idle" }));
+  const idle = svg(slotImage({ label: "AI Platform", status: "idle" }, { style: "frame" }));
   assert.match(idle, /#300a24/);
   assert.match(idle, />idle</);
   assert.doesNotMatch(idle, /stroke-width="7"/);
   const now = Date.parse("2026-10-20T10:00:00Z");
-  const done = svg(slotImage({ label: "x", status: "done" }, { doneSince: now - 125_000, now }));
+  const done = svg(slotImage({ label: "x", status: "done" }, { style: "frame", doneSince: now - 125_000, now }));
   assert.match(done, /✓ DONE · 2m/);
   assert.match(done, /#00E676/);
   assert.equal(doneLabel(0), "✓ DONE");
