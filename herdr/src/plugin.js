@@ -23,7 +23,8 @@ const state = {
 /** Visible key instances: action id -> { action, kind, slot, lastImage, peekUntil, downAt } */
 const keys = new Map();
 
-const slotCount = () => Math.max(12, ...[...keys.values()].filter((k) => k.kind === "slot").map((k) => k.slot));
+// page size = highest slot number on the deck (folder may reserve keys for other things)
+const slotCount = () => Math.max(1, ...[...keys.values()].filter((k) => k.kind === "slot").map((k) => k.slot));
 const pages = () => Math.max(1, Math.ceil(state.tabs.length / slotCount()));
 const tabForSlot = (slot) => state.tabs[state.page * slotCount() + slot - 1];
 
