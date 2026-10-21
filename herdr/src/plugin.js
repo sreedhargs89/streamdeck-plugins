@@ -1,12 +1,13 @@
 import streamDeck, { SingletonAction } from "@elgato/streamdeck";
 import { writeFile, mkdir } from "node:fs/promises";
-import { snapshot, focusTab, config } from "./herdr.js";
+import { snapshot, focusTab, config, orderTabs, keepOrder } from "./herdr.js";
 import { slotImage, peekImage, needsImage, moreImage, messageImage } from "./render.js";
 
 const POLL_MS = 1500;
 const LONG_PRESS_MS = 450;
 const PEEK_MS = 3500;
 const FLASH_MS = 6000;
+const FREEZE_MS = 3000; // tiles don't reorder this long after a key press, so you never hit a tab that just moved
 const RECENT_MS = 10 * 60_000; // a finished tab you were already looking at stays blue this long
 const WAITING = new Set(["done", "blocked"]);
 
@@ -17,6 +18,7 @@ const state = {
   prevStatus: new Map(), // tab id -> last status, to detect working -> done
   flashUntil: new Map(), // tab id -> timestamp
   doneSince: new Map(), // tab id -> when it turned "done" (for "DONE · 2m")
+  freezeUntil: 0,
   needsCursor: null, // last tab id the Needs-me key jumped to
 };
 
@@ -95,7 +97,10 @@ async function poll() {
     for (const id of state.prevStatus.keys()) if (!live.has(id)) state.prevStatus.delete(id);
     for (const id of state.doneSince.keys()) if (!live.has(id)) state.doneSince.delete(id);
     if (state.online !== true || tabs.length !== state.tabs.length) streamDeck.logger.info(`herdr online: ${tabs.length} tabs`);
-    state.tabs = tabs;
+    const frozen = now < state.freezeUntil || [...keys.values()].some((k) => k.peekUntil > now);
+    if (config.order !== "status") state.tabs = tabs;
+    else if (frozen) state.tabs = keepOrder(tabs, state.tabs.map((t) => t.id));
+    else state.tabs = orderTabs(tabs, new Set(state.doneSince.keys()));
     state.online = true;
     if (state.page >= pages()) state.page = 0;
   } catch (e) {
@@ -154,6 +159,7 @@ class SlotAction extends Base {
   onKeyDown(ev) {
     const k = keys.get(ev.action.id);
     if (k) k.downAt = Date.now();
+    state.freezeUntil = Date.now() + FREEZE_MS;
   }
   async onKeyUp(ev) {
     const k = keys.get(ev.action.id);

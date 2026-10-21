@@ -24,7 +24,27 @@ export function loadConfig(home = homedir(), env = process.env) {
     herdr: candidates.find((p) => p && existsSync(p)) ?? "herdr",
     terminal: env.HERDR_TERMINAL || file.terminal || "Ghostty",
     style: env.HERDR_STYLE || file.style || "tint", // tile style: "tint" (whole tile) or "frame" (border + strip)
+    order: env.HERDR_ORDER || file.order || "status", // "status" (needs you, running, done, idle) or "herdr"
   };
+}
+
+const RANK = { blocked: 0, working: 1, done: 2 };
+
+/**
+ * Tabs grouped by status: needs you, running, just done (incl. ids in `recentDone`), idle.
+ * Stable: herdr's order is kept inside each group.
+ */
+export function orderTabs(tabs, recentDone = new Set()) {
+  const rank = (t) => RANK[t.status] ?? (recentDone.has(t.id) ? 2 : 3);
+  return tabs.map((t, i) => [rank(t), i, t]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+}
+
+/** Keep the previous on-screen order (new tabs appended, closed ones dropped) — used while a key is being pressed. */
+export function keepOrder(tabs, prevIds) {
+  const byId = new Map(tabs.map((t) => [t.id, t]));
+  const kept = prevIds.filter((id) => byId.has(id)).map((id) => byId.get(id));
+  const known = new Set(prevIds);
+  return [...kept, ...tabs.filter((t) => !known.has(t.id))];
 }
 
 export const config = loadConfig();

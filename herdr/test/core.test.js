@@ -101,3 +101,12 @@ test("config falls back to defaults and honours env overrides", async () => {
   assert.equal(env.terminal, "iTerm");
   assert.equal(env.herdr, "/bin/sh");
 });
+
+test("tabs group by status (needs you, running, done, idle) and keep herdr order inside a group", async () => {
+  const { orderTabs, keepOrder } = await import("../src/herdr.js");
+  const t = (id, status) => ({ id, status });
+  const tabs = [t("a", "idle"), t("b", "working"), t("c", "done"), t("d", "blocked"), t("e", "working"), t("f", "idle")];
+  assert.deepEqual(orderTabs(tabs).map((x) => x.id), ["d", "b", "e", "c", "a", "f"]);
+  assert.deepEqual(orderTabs(tabs, new Set(["f"])).map((x) => x.id), ["d", "b", "e", "c", "f", "a"]);
+  assert.deepEqual(keepOrder([t("a"), t("b"), t("z")], ["b", "gone", "a"]).map((x) => x.id), ["b", "a", "z"]);
+});
