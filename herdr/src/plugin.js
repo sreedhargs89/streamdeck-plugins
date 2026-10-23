@@ -15,7 +15,7 @@ const WAITING = new Set(["done", "blocked"]);
 const state = {
   tabs: [],
   online: null, // null = not polled yet
-  page: 0,
+  pages: new Map(), // device id -> current page (each Stream Deck pages on its own)
   prevStatus: new Map(), // tab id -> last status, to detect working -> done
   flashUntil: new Map(), // tab id -> timestamp
   doneSince: new Map(), // tab id -> when it turned "done" (for "DONE · 2m")
@@ -45,10 +45,13 @@ async function saveRecency(now) {
 /** Visible key instances: action id -> { action, kind, slot, lastImage, peekUntil, downAt } */
 const keys = new Map();
 
-// page size = highest slot number on the deck (folder may reserve keys for other things)
-const slotCount = () => Math.max(1, ...[...keys.values()].filter((k) => k.kind === "slot").map((k) => k.slot));
-const pages = () => Math.max(1, Math.ceil(state.tabs.length / slotCount()));
-const tabForSlot = (slot) => state.tabs[state.page * slotCount() + slot - 1];
+// Per device: page size = highest slot number showing on that deck (folders may reserve keys for other things).
+// A deck showing slots without a More key (e.g. "top 3 tabs" on a home screen) always shows page 1.
+const onDevice = (dev, kind) => [...keys.values()].filter((k) => k.device === dev && k.kind === kind);
+const slotCount = (dev) => Math.max(1, ...onDevice(dev, "slot").map((k) => k.slot));
+const pages = (dev) => Math.max(1, Math.ceil(state.tabs.length / slotCount(dev)));
+const pageOf = (dev) => (onDevice(dev, "more").length ? Math.min(state.pages.get(dev) ?? 0, pages(dev) - 1) : 0);
+const tabForSlot = (k) => state.tabs[pageOf(k.device) * slotCount(k.device) + k.slot - 1];
 
 async function paint(k, image) {
   if (k.lastImage === image) return;
@@ -65,7 +68,7 @@ function renderKey(k, now = Date.now()) {
     return paint(k, messageImage(k.kind === "slot" && k.slot !== 1 ? [] : ["herdr", "offline"]));
   }
   if (k.kind === "slot") {
-    const raw = tabForSlot(k.slot);
+    const raw = tabForSlot(k);
     // herdr marks a tab you're looking at "idle" when it finishes; show it as just-done anyway
     const tab = raw && raw.status === "idle" && state.doneSince.has(raw.id) ? { ...raw, status: "done" } : raw;
     if (k.peekUntil > now) return paint(k, peekImage(tab));
@@ -77,9 +80,9 @@ function renderKey(k, now = Date.now()) {
     const waiting = state.tabs.filter((t) => WAITING.has(t.status));
     return paint(k, needsImage(waiting.length, waiting.filter((t) => t.status === "blocked").length));
   }
-  const p = pages();
-  const shown = (state.page + 1) * slotCount();
-  return paint(k, moreImage(state.page, p, Math.max(0, state.tabs.length - shown)));
+  const page = pageOf(k.device);
+  const shown = (page + 1) * slotCount(k.device);
+  return paint(k, moreImage(page, pages(k.device), Math.max(0, state.tabs.length - shown)));
 }
 
 // small health file for troubleshooting: <plugin>/logs/status.json
@@ -87,7 +90,7 @@ let lastError = null;
 async function writeStatus() {
   const visible = {};
   for (const k of keys.values()) visible[k.kind] = (visible[k.kind] ?? 0) + 1;
-  const body = { at: new Date().toISOString(), online: state.online, tabs: state.tabs.length, page: state.page, visible, lastError };
+  const body = { at: new Date().toISOString(), online: state.online, tabs: state.tabs.length, pages: Object.fromEntries(state.pages), visible, lastError };
   try {
     await mkdir("logs", { recursive: true });
     await writeFile("logs/status.json", JSON.stringify(body, null, 2));
@@ -125,7 +128,6 @@ async function poll() {
     else if (frozen) state.tabs = keepOrder(tabs, state.tabs.map((t) => t.id));
     else state.tabs = orderTabs(tabs, new Set(state.doneSince.keys()), state.lastActive);
     state.online = true;
-    if (state.page >= pages()) state.page = 0;
   } catch (e) {
     if (state.online !== false) streamDeck.logger.warn(`herdr poll failed: ${e.message}`);
     lastError = e.message;
@@ -158,7 +160,7 @@ class Base extends SingletonAction {
   }
   onWillAppear(ev) {
     const slot = Number(ev.payload.settings?.slot) || 1;
-    const k = { action: ev.action, kind: this.kind, slot, lastImage: null, peekUntil: 0, downAt: 0 };
+    const k = { action: ev.action, device: ev.action.device?.id ?? "deck", kind: this.kind, slot, lastImage: null, peekUntil: 0, downAt: 0 };
     keys.set(ev.action.id, k);
     streamDeck.logger.info(`appear ${this.kind}${this.kind === "slot" ? ` #${slot}` : ""} (${keys.size} visible)`);
     return renderKey(k);
@@ -187,7 +189,7 @@ class SlotAction extends Base {
   async onKeyUp(ev) {
     const k = keys.get(ev.action.id);
     if (!k) return;
-    const tab = tabForSlot(k.slot);
+    const tab = tabForSlot(k);
     if (Date.now() - k.downAt >= LONG_PRESS_MS) {
       k.peekUntil = Date.now() + PEEK_MS;
       await renderKey(k);
@@ -217,8 +219,9 @@ class MoreAction extends Base {
   constructor() {
     super("com.sree.herdr.more", "more");
   }
-  async onKeyUp() {
-    state.page = (state.page + 1) % pages();
+  async onKeyUp(ev) {
+    const dev = keys.get(ev.action.id)?.device ?? "deck";
+    state.pages.set(dev, (pageOf(dev) + 1) % pages(dev));
     await renderAll();
   }
 }
