@@ -110,3 +110,11 @@ test("tabs group by status (needs you, running, done, idle) and keep herdr order
   assert.deepEqual(orderTabs(tabs, new Set(["f"])).map((x) => x.id), ["d", "b", "e", "c", "f", "a"]);
   assert.deepEqual(keepOrder([t("a"), t("b"), t("z")], ["b", "gone", "a"]).map((x) => x.id), ["b", "a", "z"]);
 });
+
+test("inside each status group the most recently active tab comes first", async () => {
+  const { orderTabs } = await import("../src/herdr.js");
+  const t = (id, status) => ({ id, status });
+  const tabs = [t("a", "idle"), t("b", "working"), t("audit", "idle"), t("e", "working"), t("f", "idle")];
+  const seen = new Map([["audit", 900], ["e", 500], ["b", 100], ["a", 50]]);
+  assert.deepEqual(orderTabs(tabs, new Set(), seen).map((x) => x.id), ["e", "b", "audit", "a", "f"]);
+});

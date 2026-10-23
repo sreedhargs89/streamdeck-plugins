@@ -32,11 +32,15 @@ const RANK = { blocked: 0, working: 1, done: 2 };
 
 /**
  * Tabs grouped by status: needs you, running, just done (incl. ids in `recentDone`), idle.
- * Stable: herdr's order is kept inside each group.
+ * Inside each group the most recently active tab (`lastActive`: id -> ms) comes first; ties keep herdr's order.
  */
-export function orderTabs(tabs, recentDone = new Set()) {
+export function orderTabs(tabs, recentDone = new Set(), lastActive = new Map()) {
   const rank = (t) => RANK[t.status] ?? (recentDone.has(t.id) ? 2 : 3);
-  return tabs.map((t, i) => [rank(t), i, t]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+  const seen = (t) => lastActive.get(t.id) ?? 0;
+  return tabs
+    .map((t, i) => [rank(t), seen(t), i, t])
+    .sort((a, b) => a[0] - b[0] || b[1] - a[1] || a[2] - b[2])
+    .map((x) => x[3]);
 }
 
 /** Keep the previous on-screen order (new tabs appended, closed ones dropped) — used while a key is being pressed. */

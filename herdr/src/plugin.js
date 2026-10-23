@@ -1,5 +1,6 @@
 import streamDeck, { SingletonAction } from "@elgato/streamdeck";
 import { writeFile, mkdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { snapshot, focusTab, config, orderTabs, keepOrder } from "./herdr.js";
 import { slotImage, peekImage, needsImage, moreImage, messageImage } from "./render.js";
 
@@ -19,8 +20,27 @@ const state = {
   flashUntil: new Map(), // tab id -> timestamp
   doneSince: new Map(), // tab id -> when it turned "done" (for "DONE · 2m")
   freezeUntil: 0,
+  lastActive: loadRecency(), // tab id -> last time it ran, changed status or was focused (herdr has no timestamps)
+  recencySavedAt: 0,
   needsCursor: null, // last tab id the Needs-me key jumped to
 };
+
+const RECENCY_FILE = "logs/recency.json";
+function loadRecency() {
+  try {
+    return new Map(Object.entries(JSON.parse(readFileSync(RECENCY_FILE, "utf8"))));
+  } catch {
+    return new Map();
+  }
+}
+async function saveRecency(now) {
+  if (now - state.recencySavedAt < 30_000) return;
+  state.recencySavedAt = now;
+  try {
+    await mkdir("logs", { recursive: true });
+    await writeFile(RECENCY_FILE, JSON.stringify(Object.fromEntries(state.lastActive)));
+  } catch {}
+}
 
 /** Visible key instances: action id -> { action, kind, slot, lastImage, peekUntil, downAt } */
 const keys = new Map();
@@ -91,16 +111,19 @@ async function poll() {
       const since = state.doneSince.get(t.id);
       const stale = t.status === "idle" && since && now - since > RECENT_MS;
       if (t.status === "working" || t.status === "blocked" || stale || (t.status === "idle" && !since)) state.doneSince.delete(t.id);
+      if (t.status === "working" || t.status === "blocked" || t.focused || (before !== undefined && before !== t.status)) state.lastActive.set(t.id, now);
       state.prevStatus.set(t.id, t.status);
     }
     const live = new Set(tabs.map((t) => t.id));
     for (const id of state.prevStatus.keys()) if (!live.has(id)) state.prevStatus.delete(id);
     for (const id of state.doneSince.keys()) if (!live.has(id)) state.doneSince.delete(id);
+    for (const id of state.lastActive.keys()) if (!live.has(id)) state.lastActive.delete(id);
+    saveRecency(now);
     if (state.online !== true || tabs.length !== state.tabs.length) streamDeck.logger.info(`herdr online: ${tabs.length} tabs`);
     const frozen = now < state.freezeUntil || [...keys.values()].some((k) => k.peekUntil > now);
     if (config.order !== "status") state.tabs = tabs;
     else if (frozen) state.tabs = keepOrder(tabs, state.tabs.map((t) => t.id));
-    else state.tabs = orderTabs(tabs, new Set(state.doneSince.keys()));
+    else state.tabs = orderTabs(tabs, new Set(state.doneSince.keys()), state.lastActive);
     state.online = true;
     if (state.page >= pages()) state.page = 0;
   } catch (e) {

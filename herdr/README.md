@@ -47,7 +47,8 @@ Defaults: terminal `Ghostty`; herdr found in `~/.local/bin`, `/opt/homebrew/bin`
 
 Tile colours show the agent status: **blue (pulsing) = running**, **green ✓ = done** (with time since,
 also when you were already in that tab: stays green 10 min or until pressed), **red = needs you**, aubergine = idle.
-Tabs are grouped by status — **needs you → running → done → idle** (herdr order inside each group);
+Tabs are grouped by status — **needs you → running → done → idle**, most recently active first inside each group
+(a tab is "active" when it runs, changes status or is focused; kept in `logs/recency.json` across restarts);
 the layout holds still for 3 s after you press a key. `"order": "herdr"` keeps herdr's fixed order instead.
 `"style": "tint"` colours the whole tile; `"frame"` keeps tiles aubergine with a coloured border + label strip.
 Restart the plugin after changing the config.
