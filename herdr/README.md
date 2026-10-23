@@ -32,6 +32,8 @@ node scripts/preview.js > preview/deck.svg   # render the folder from live herdr
    node scripts/install-folder.js --list
    node scripts/install-folder.js --profile "Profile 1" --page 1 --key 3,0
    ```
+   `--profile` takes a name or the id shown by `--list`. The folder fills the whole deck for that model
+   (MK.2 5x3 → 9 tabs, XL 8x4 → 26 tabs): Back, Needs me, tabs, More, then your fixed prompt keys (below).
    Keys are `column,row` from the top-left. Or drag the three actions from the **herdr Live** category in the app
    and set each Agent Slot's `slot` number.
 
@@ -40,8 +42,17 @@ node scripts/preview.js > preview/deck.svg   # render the folder from live herdr
 Optional `~/.config/streamdeck-herdr.json`:
 
 ```json
-{ "terminal": "iTerm", "herdr": "/opt/homebrew/bin/herdr", "style": "frame" }
+{
+  "terminal": "iTerm", "herdr": "/opt/homebrew/bin/herdr", "style": "frame",
+  "prompts": [
+    { "title": "Mail", "icon": "mail", "text": "/draft-mail reply in my own simple, basic words: " },
+    { "title": "Scan", "icon": "scan", "text": "/stn " }
+  ]
+}
 ```
+
+`prompts` become Text keys at the end of the folder (`install-folder.js` reads them; icons from `imgs/prompts/`).
+They type the text into the focused terminal without pressing Enter.
 
 Defaults: terminal `Ghostty`; herdr found in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin`; style `tint`.
 
