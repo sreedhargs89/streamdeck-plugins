@@ -96,7 +96,8 @@ final class Host {
   }
 
   func start() {
-    guard let node = Host.nodePath(), let script = Bundle.main.path(forResource: "host/host", ofType: "js") else {
+    let dev = UserDefaults.standard.string(forKey: "HostPath").flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil }
+    guard let node = Host.nodePath(), let script = dev ?? Bundle.main.path(forResource: "host/host", ofType: "js") else {
       NSLog("SreeDeck: node or host.js missing"); return
     }
     let p = Process()
@@ -148,7 +149,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var images: [Int: NSImage] = [:]
   let host = Host()
   var status: NSStatusItem!
-  var hotKey: EventHotKeyRef?
 
   func applicationDidFinishLaunching(_ n: Notification) {
     panel = DeckPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
@@ -198,7 +198,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func handle(_ m: [String: Any]) {
     switch m["t"] as? String {
     case "layout":
-      layout(columns: m["columns"] as? Int ?? 4, rows: m["rows"] as? Int ?? 2)
+      columns = m["columns"] as? Int ?? 4
+      layout(columns: columns, rows: m["rows"] as? Int ?? 2)
     case "img":
       guard let i = m["i"] as? Int, i < keys.count else { return }
       let png = m["png"] as? String ?? ""
@@ -232,6 +233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     status.button?.title = "🎛"
     let menu = NSMenu()
     menu.addItem(withTitle: "Show / Hide  (⌃⌥⌘Space)", action: #selector(toggle), keyEquivalent: "")
+    menu.addItem(withTitle: "Home", action: #selector(home), keyEquivalent: "")
     menu.addItem(withTitle: "Edit Keys…", action: #selector(editKeys), keyEquivalent: "")
     menu.addItem(withTitle: "Reload", action: #selector(reload), keyEquivalent: "")
     let login = menu.addItem(withTitle: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
@@ -244,6 +246,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @objc func toggle() { panel.isVisible ? panel.orderOut(nil) : panel.orderFrontRegardless() }
   @objc func editKeys() { NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.config/sree-deck/deck.json")) }
   @objc func reload() { host.send(["t": "reload"]) }
+  @objc func home() { host.send(["t": "home"]) }
   @objc func quit() { NSApp.terminate(nil) }
   @objc func toggleLogin(_ item: NSMenuItem) {
     let svc = SMAppService.mainApp
@@ -251,16 +254,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     item.state = svc.status == .enabled ? .on : .off
   }
 
-  // MARK: global hotkey ⌃⌥⌘Space (Carbon: no Accessibility permission needed)
+  // MARK: global hotkeys (Carbon: no Accessibility permission needed)
+  //   ⌃⌥⌘Space  show/hide
+  //   ⌃⌥1 … ⌃⌥8  press the keys in row 1;  ⌃⌥Q … ⌃⌥I  row 2  (held = key held, so hold-to-talk works)
+  static let rowKeys: [[Int]] = [
+    [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8],
+    [kVK_ANSI_Q, kVK_ANSI_W, kVK_ANSI_E, kVK_ANSI_R, kVK_ANSI_T, kVK_ANSI_Y, kVK_ANSI_U, kVK_ANSI_I],
+  ]
+  var columns = 4
+
+  func hotKeyEvent(id: UInt32, pressed: Bool) {
+    if id == 1 { if pressed { toggle() }; return }
+    let slot = Int(id) - 100, row = slot / 8, col = slot % 8
+    guard col < columns else { return }
+    let i = row * columns + col
+    guard i < keys.count else { return }
+    keys[i].layer?.transform = pressed ? CATransform3DMakeScale(0.93, 0.93, 1) : CATransform3DIdentity
+    host.send(["t": pressed ? "down" : "up", "i": i])
+  }
+
   func registerHotKey() {
-    var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-    InstallEventHandler(GetApplicationEventTarget(), { _, _, ctx in
+    var specs = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+                 EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))]
+    InstallEventHandler(GetApplicationEventTarget(), { _, event, ctx in
+      var hk = EventHotKeyID()
+      GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hk)
+      let pressed = GetEventKind(event) == UInt32(kEventHotKeyPressed)
       let me = Unmanaged<AppDelegate>.fromOpaque(ctx!).takeUnretainedValue()
-      DispatchQueue.main.async { me.toggle() }
+      DispatchQueue.main.async { me.hotKeyEvent(id: hk.id, pressed: pressed) }
       return noErr
-    }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
-    let id = EventHotKeyID(signature: OSType(0x5344_4B31), id: 1)  // "SDK1"
-    RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey | controlKey), id, GetApplicationEventTarget(), 0, &hotKey)
+    }, 2, &specs, Unmanaged.passUnretained(self).toOpaque(), nil)
+    let sig = OSType(0x5344_4B31)  // "SDK1"
+    var ref: EventHotKeyRef?
+    RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey | controlKey), EventHotKeyID(signature: sig, id: 1), GetApplicationEventTarget(), 0, &ref)
+    for (r, row) in AppDelegate.rowKeys.enumerated() {
+      for (c, key) in row.enumerated() {
+        RegisterEventHotKey(UInt32(key), UInt32(controlKey | optionKey), EventHotKeyID(signature: sig, id: UInt32(100 + r * 8 + c)), GetApplicationEventTarget(), 0, &ref)
+      }
+    }
   }
 }
 
