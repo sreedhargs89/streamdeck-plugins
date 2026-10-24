@@ -1,0 +1,9 @@
+{
+  "name": "sree-deck-host",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Runs Stream Deck plugins for Sree Deck: speaks the Stream Deck plugin protocol, renders their key images",
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": { "@resvg/resvg-js": "^2.6.2", "ws": "^8.18.0" }
+}
