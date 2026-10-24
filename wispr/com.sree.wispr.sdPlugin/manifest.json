@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.sree.wispr",
+  "Name": "Wispr Keys",
+  "Version": "1.0.0.0",
+  "Author": "Sree",
+  "Description": "Drive Wispr Flow from Stream Deck: dictation toggle, push-to-talk (real Fn), Lens, Polish, Scratchpad and deep links.",
+  "Category": "Wispr Keys",
+  "CategoryIcon": "imgs/category",
+  "Icon": "imgs/plugin",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Nodejs": { "Version": "24", "Debug": "disabled" },
+  "Software": { "MinimumVersion": "7.1" },
+  "OS": [{ "Platform": "mac", "MinimumVersion": "13" }],
+  "Actions": [
+    {
+      "UUID": "com.sree.wispr.dictate",
+      "Name": "Dictate (toggle)",
+      "Tooltip": "Press to start hands-free dictation, press again to stop.",
+      "Icon": "imgs/dictate-off",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "States": [{ "Image": "imgs/dictate-off", "ShowTitle": false }, { "Image": "imgs/dictate-on", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.sree.wispr.keys",
+      "Name": "Wispr Shortcut",
+      "Tooltip": "Presses a Wispr shortcut with real key events (Fn works). Settings: keys e.g. opt+1, hold for push-to-talk.",
+      "Icon": "imgs/keys",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/keys" }]
+    },
+    {
+      "UUID": "com.sree.wispr.link",
+      "Name": "Wispr Link",
+      "Tooltip": "Opens a Wispr deep link: start-hands-free, stop-hands-free, switch-mic, open.",
+      "Icon": "imgs/link",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/link" }]
+    }
+  ]
+}

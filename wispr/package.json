@@ -1,0 +1,18 @@
+{
+  "name": "streamdeck-wispr",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wispr Keys — Stream Deck plugin for Wispr Flow (dictation, push-to-talk, shortcuts)",
+  "scripts": {
+    "build": "esbuild src/plugin.js --bundle --platform=node --format=esm --target=node24 --outfile=com.sree.wispr.sdPlugin/bin/plugin.js \"--banner:js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" && swiftc -O scripts/keys.swift -o com.sree.wispr.sdPlugin/bin/keys",
+    "images": "python3 scripts/make-images.py",
+    "test": "node --test test/*.test.js",
+    "validate": "streamdeck validate com.sree.wispr.sdPlugin",
+    "link": "streamdeck link com.sree.wispr.sdPlugin",
+    "reload": "npm run build && (pkill -f 'com.sree.wispr.sdPlugin/bin' || true)",
+    "pack": "npm run build && mkdir -p dist && streamdeck pack com.sree.wispr.sdPlugin --output dist --force"
+  },
+  "dependencies": { "@elgato/streamdeck": "^3.0.2" },
+  "devDependencies": { "@elgato/cli": "^1.10.2", "esbuild": "^0.25.10" }
+}

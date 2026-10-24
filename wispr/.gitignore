@@ -1,0 +1,7 @@
+node_modules/
+com.sree.wispr.sdPlugin/bin/
+com.sree.wispr.sdPlugin/logs/
+preview/
+dist/
+*.streamDeckPlugin
+.DS_Store
