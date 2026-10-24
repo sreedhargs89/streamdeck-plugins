@@ -39,5 +39,7 @@ export function toCodes(combo) {
 const run = (bin, args) =>
   new Promise((resolve, reject) => execFile(bin, args, { timeout: 4000 }, (err, _o, stderr) => (err ? reject(new Error(stderr?.trim() || err.message)) : resolve())));
 
-export const openLink = (name) => run("/usr/bin/open", [LINKS[name] ?? name]);
+/** Opens a deep link. In the background (-g) except "open", so the app you're typing in keeps focus and Wispr pastes there. */
+export const openArgs = (name) => (name === "open" ? [LINKS.open] : ["-g", LINKS[name] ?? name]);
+export const openLink = (name) => run("/usr/bin/open", openArgs(name));
 export const keys = (mode, combo) => run(KEYS_BIN, [mode, toCodes(combo)]);

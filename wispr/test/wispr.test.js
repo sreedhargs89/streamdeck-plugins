@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toCodes, LINKS } from "../src/wispr.js";
+import { toCodes, LINKS, openArgs } from "../src/wispr.js";
 
 test("key names map to the macOS codes Wispr stores", () => {
   assert.equal(toCodes("opt+1"), "58+18"); // Wispr: polish "18+58"
@@ -16,4 +16,10 @@ test("key names map to the macOS codes Wispr stores", () => {
 
 test("deep links are Wispr's own", () => {
   assert.equal(LINKS["start-hands-free"], "wispr-flow://start-hands-free");
+});
+
+test("dictation links open in the background so focus (and the paste) stays in your app", () => {
+  assert.deepEqual(openArgs("stop-hands-free"), ["-g", "wispr-flow://stop-hands-free"]);
+  assert.deepEqual(openArgs("start-hands-free"), ["-g", "wispr-flow://start-hands-free"]);
+  assert.deepEqual(openArgs("open"), ["wispr-flow://open"]);
 });
