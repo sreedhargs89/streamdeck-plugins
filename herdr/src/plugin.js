@@ -48,10 +48,19 @@ const keys = new Map();
 // Per device: page size = highest slot number showing on that deck (folders may reserve keys for other things).
 // A deck showing slots without a More key (e.g. "top 3 tabs" on a home screen) always shows page 1.
 const onDevice = (dev, kind) => [...keys.values()].filter((k) => k.device === dev && k.kind === kind);
-const slotCount = (dev) => Math.max(1, ...onDevice(dev, "slot").map((k) => k.slot));
+const slotCount = (dev) => Math.max(1, ...onDevice(dev, "slot").filter((k) => !k.active).map((k) => k.slot));
 const pages = (dev) => Math.max(1, Math.ceil(state.tabs.length / slotCount(dev)));
 const pageOf = (dev) => (onDevice(dev, "more").length ? Math.min(state.pages.get(dev) ?? 0, pages(dev) - 1) : 0);
-const tabForSlot = (k) => state.tabs[pageOf(k.device) * slotCount(k.device) + k.slot - 1];
+const tabForSlot = (k) => (k.active ? activeTabs(k.pin)[k.slot - 1] : state.tabs[pageOf(k.device) * slotCount(k.device) + k.slot - 1]);
+
+// "Active" slot keys (settings.show = "active") show only pinned tabs + tabs that are running, need you or just
+// finished — a short always-relevant row; the full list lives on normal slots (e.g. in a folder).
+const ACTIVE = new Set(["working", "blocked", "done"]);
+function activeTabs(pin = []) {
+  const pinned = pin.map((label) => state.tabs.find((t) => t.label.toLowerCase() === String(label).toLowerCase())).filter(Boolean);
+  const live = state.tabs.filter((t) => !pinned.includes(t) && (ACTIVE.has(t.status) || state.doneSince.has(t.id)));
+  return [...pinned, ...live];
+}
 
 async function paint(k, image) {
   if (k.lastImage === image) return;
@@ -160,7 +169,8 @@ class Base extends SingletonAction {
   }
   onWillAppear(ev) {
     const slot = Number(ev.payload.settings?.slot) || 1;
-    const k = { action: ev.action, device: ev.action.device?.id ?? "deck", kind: this.kind, slot, lastImage: null, peekUntil: 0, downAt: 0 };
+    const s = ev.payload.settings ?? {};
+    const k = { action: ev.action, device: ev.action.device?.id ?? "deck", kind: this.kind, slot, active: s.show === "active", pin: [].concat(s.pin ?? []), lastImage: null, peekUntil: 0, downAt: 0 };
     keys.set(ev.action.id, k);
     streamDeck.logger.info(`appear ${this.kind}${this.kind === "slot" ? ` #${slot}` : ""} (${keys.size} visible)`);
     return renderKey(k);
@@ -172,6 +182,8 @@ class Base extends SingletonAction {
     const k = keys.get(ev.action.id);
     if (!k) return;
     k.slot = Number(ev.payload.settings?.slot) || 1;
+    k.active = ev.payload.settings?.show === "active";
+    k.pin = [].concat(ev.payload.settings?.pin ?? []);
     k.lastImage = null;
     return renderKey(k);
   }

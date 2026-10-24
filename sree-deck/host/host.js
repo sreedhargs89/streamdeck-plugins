@@ -199,7 +199,10 @@ async function builtin(k) {
       const before = await new Promise((r) => execFile("/usr/bin/pbpaste", (e, out) => r(e ? "" : out)));
       await run("/usr/bin/pbcopy", [], c.text);
       await pressKeys("55+9"); // cmd+v
-      if (c.enter) await pressKeys("36");
+      if (c.enter) {
+        await new Promise((r) => setTimeout(r, 250)); // let the app (Slack, Electron) take the paste before Enter
+        await pressKeys("36");
+      }
       setTimeout(() => run("/usr/bin/pbcopy", [], before), 800);
       return true;
     }
