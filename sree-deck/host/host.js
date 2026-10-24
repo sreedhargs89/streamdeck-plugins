@@ -34,6 +34,8 @@ let stack = []; // drawer: open folders, each { cfg, path }; stack[0].i = the ma
 let keys = []; // keys on the visible page: { i, cfg, context, column, row }
 const keyState = new Map(); // context -> { state, settings } (kept while you browse folders, like Stream Deck)
 const downAt = new Map();
+const FOLDER_DEBOUNCE_MS = 400; // a double-click on a folder shouldn't open and instantly close it
+let lastFolderPress = 0;
 
 function boot() {
   deck = loadDeck();
@@ -224,6 +226,10 @@ function press(i, down) {
   if (down) downAt.set(i, Date.now());
   if (k.cfg.plugin) return toPlugin(k, down ? "keyDown" : "keyUp");
   if (down) return;
+  if (k.cfg.type === "folder" || k.cfg.type === "back") {
+    if (Date.now() - lastFolderPress < FOLDER_DEBOUNCE_MS) return;
+    lastFolderPress = Date.now();
+  }
   if (k.cfg.type === "folder") {
     if (i < mainCount()) stack = stack[0]?.i === i ? [] : [{ cfg: k.cfg, path: String(i), i }]; // open / switch / close the drawer
     else stack.push({ cfg: k.cfg, path: String(i - mainCount()) });
