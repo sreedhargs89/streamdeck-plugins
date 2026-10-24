@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toCodes, LINKS, openArgs } from "../src/wispr.js";
+import { toCodes, toSequence, LINKS, openArgs } from "../src/wispr.js";
 
 test("key names map to the macOS codes Wispr stores", () => {
   assert.equal(toCodes("opt+1"), "58+18"); // Wispr: polish "18+58"
@@ -22,4 +22,11 @@ test("dictation links open in the background so focus (and the paste) stays in y
   assert.deepEqual(openArgs("stop-hands-free"), ["-g", "wispr-flow://stop-hands-free"]);
   assert.deepEqual(openArgs("start-hands-free"), ["-g", "wispr-flow://start-hands-free"]);
   assert.deepEqual(openArgs("open"), ["wispr-flow://open"]);
+});
+
+test("sequences with repeated groups (Clear: end, then 40x ctrl+u + delete)", () => {
+  const seq = toSequence("ctrl+e, (ctrl+u, delete)*40");
+  assert.equal(seq.length, 81);
+  assert.deepEqual(seq.slice(0, 3), ["59+14", "59+32", "51"]);
+  assert.deepEqual(toSequence("opt+1"), ["58+18"]);
 });

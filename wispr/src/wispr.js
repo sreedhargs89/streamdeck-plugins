@@ -16,7 +16,7 @@ export const LINKS = {
 };
 
 // Readable names -> macOS key codes (Wispr stores its shortcuts as these codes, e.g. "18+58" = Option+1).
-const NAMES = { fn: 63, ctrl: 59, control: 59, opt: 58, option: 58, alt: 58, cmd: 55, command: 55, shift: 56, space: 49, esc: 53, enter: 36 };
+const NAMES = { delete: 51, backspace: 51, fn: 63, ctrl: 59, control: 59, opt: 58, option: 58, alt: 58, cmd: 55, command: 55, shift: 56, space: 49, esc: 53, enter: 36 };
 const LETTERS = "asdfhgzxcv_bqweryt123465=97-80]ou[ip_lj'k;\\,/nm.";
 for (let i = 0; i < LETTERS.length; i++) if (LETTERS[i] !== "_" && !(LETTERS[i] in NAMES)) NAMES[LETTERS[i]] = i;
 
@@ -42,4 +42,20 @@ const run = (bin, args) =>
 /** Opens a deep link. In the background (-g) except "open", so the app you're typing in keeps focus and Wispr pastes there. */
 export const openArgs = (name) => (name === "open" ? [LINKS.open] : ["-g", LINKS[name] ?? name]);
 export const openLink = (name) => run("/usr/bin/open", openArgs(name));
-export const keys = (mode, combo) => run(KEYS_BIN, [mode, toCodes(combo)]);
+/**
+ * A key sequence -> list of combos. Comma-separated; "(a, b)*40" repeats a group.
+ * "ctrl+e, (ctrl+u, delete)*40" = go to end, then 40x delete-to-line-start + backspace (clears a multi-line prompt).
+ */
+export function toSequence(spec) {
+  const out = [];
+  for (const m of String(spec).matchAll(/\(([^)]*)\)\s*\*\s*(\d+)|([^,()]+)/g)) {
+    if (m[1] !== undefined) {
+      const group = toSequence(m[1]);
+      for (let i = 0; i < Math.min(Number(m[2]), 200); i++) out.push(...group);
+    } else if (m[3].trim()) out.push(toCodes(m[3]));
+  }
+  if (!out.length) throw new Error("no keys");
+  return out;
+}
+
+export const keys = (mode, combo) => run(KEYS_BIN, [mode, ...(mode === "tap" ? toSequence(combo) : [toCodes(combo)])]);
