@@ -19,18 +19,35 @@ const PLUGINS = join(homedir(), "Library/Application Support/com.elgato.StreamDe
  *     { "type": "folder", "title": "Wispr", "icon": "icons/wispr.png", "keys": [ … ] }
  *   ]
  * }
- * A folder page starts with ◀ Back (long-press it for Home), then the folder's keys.
+ * Folders open as a drawer of 1–2 rows under the main keys (folders inside folders get ◀ Back in the drawer).
  */
 export function loadDeck(path = CONFIG) {
   const d = JSON.parse(readFileSync(path, "utf8"));
   return { columns: Number(d.columns) || 4, rows: Number(d.rows) || 2, keys: d.keys ?? [] };
 }
 
-/** The keys of the root page, or of an open folder (Back first), padded with blanks to the deck size. */
-export function pageKeys(deck, folder) {
+/** The main keys, padded with blanks to the deck size. */
+export function pageKeys(deck) {
   const n = deck.columns * deck.rows;
-  const keys = folder ? [{ type: "back" }, ...(folder.keys ?? [])] : [...deck.keys];
-  return Array.from({ length: n }, (_, i) => keys[i] ?? {});
+  return Array.from({ length: n }, (_, i) => deck.keys[i] ?? {});
+}
+
+/**
+ * The drawer under the main keys for the open folders (outermost first): nothing when closed, otherwise the
+ * innermost folder's keys — with ◀ Back first when it's a folder inside a folder — in 1 or 2 full rows.
+ */
+export function drawerKeys(deck, folders) {
+  if (!folders.length) return [];
+  const inner = folders.at(-1);
+  const keys = [...(folders.length > 1 ? [{ type: "back" }] : []), ...(inner.keys ?? [])].slice(0, deck.columns * 2);
+  const rows = Math.max(1, Math.ceil(keys.length / deck.columns));
+  return Array.from({ length: rows * deck.columns }, (_, i) => keys[i] ?? {});
+}
+
+/** The key image with a highlight frame (the folder whose drawer is open). */
+export function outlined(image) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="144" height="144"><image width="144" height="144" href="${image}" xlink:href="${image}"/><rect x="4" y="4" width="136" height="136" rx="14" fill="none" stroke="#40C4FF" stroke-width="8"/></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
 /** Every plugin used anywhere in the deck, folders included (started once, up front). */

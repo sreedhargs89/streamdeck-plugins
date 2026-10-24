@@ -6,9 +6,10 @@ dictation on/off) look and behave exactly like on the hardware.
 
 - Never takes focus: click a key and your typing stays in the app you were in.
 - **⌃⌥⌘Space** shows/hides it; drag it by the dark border; it remembers where you put it.
-- **Folders** work like on the hardware: a folder key opens its page with ◀ Back first (long-press Back = Home);
-  plugin keys get willDisappear/willAppear as pages change, so live keys pause and resume exactly like on a real deck.
-- **Hotkeys** press whatever key sits at that spot on the current page — row 1: ⌃⌥1 … ⌃⌥8, row 2: ⌃⌥Q … ⌃⌥I
+- **Folders open as a drawer**: your main keys never move; a folder adds 1–2 rows below them (framed in blue
+  while open — click it again to close, or another folder to switch). Folders inside folders open in the drawer
+  with ◀ Back (long-press = close). Plugin keys in the drawer get willAppear/willDisappear like on a real deck.
+- **Hotkeys** press whatever key sits at that spot on the current page — row 1: ⌃⌥1 … ⌃⌥8, row 2: ⌃⌥Q … ⌃⌥I (main keys)
   (holding the hotkey holds the key, so hold-to-talk works from the keyboard).
 - Menu-bar 🎛: Show/Hide, Home, Edit Keys…, Reload, Launch at Login, Quit.
 
