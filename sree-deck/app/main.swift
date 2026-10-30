@@ -351,8 +351,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     case "drawer":
       drawerOpen = m["open"] as? Bool ?? false
       updateEscape()
-    case "pick":
-      if (m["stay"] as? Bool) == true { touchPicking() } else { stopPicking() }
     case "marks":
       badges = [:]
       for (k, v) in (m["badges"] as? [String: Int]) ?? [:] { if let i = Int(k) { badges[i] = v } }
@@ -446,9 +444,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: global hotkeys (Carbon: no Accessibility permission needed)
   //   ⌃⌥⌘Space  show/hide
-  //   ⌘⌥Space    pick mode: then plain 1 … 9 press the numbered keys (badges) — folders when the drawer is closed,
-  //              the drawer's keys when it's open; 0 / Esc = back. Digits are only captured during pick mode
-  //              (ends after a non-folder key, Esc with nothing open, or 4 s idle). Esc = back while a drawer is open.
+  //   ⌃1 … ⌃9    the numbered keys (badges): folders when the drawer is closed, the drawer's keys when it's open
+  //   ⌃0 / Esc   back / close the drawer (Esc is only taken while a drawer is open)
   //   ⌃⌥Q … ⌃⌥I  press the keys in row 2 by position  (held = key held, so hold-to-talk works)
   static let rowKeys: [[Int]] = [
     [],
@@ -458,13 +455,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var columns = 4
   var escHotKey: EventHotKeyRef?
   var drawerOpen = false
-  var picking = false
-  var digitHotKeys: [EventHotKeyRef] = []
-  var pickTimer: Timer?
-
-  /// Esc is taken only while a drawer is open or pick mode is on; otherwise it's left alone for every other app.
+  /// Esc is taken only while a drawer is open; otherwise it's left alone for every other app.
   func updateEscape() {
-    let on = drawerOpen || picking
+    let on = drawerOpen
     if on, escHotKey == nil {
       RegisterEventHotKey(UInt32(kVK_Escape), 0, EventHotKeyID(signature: OSType(0x5344_4B31), id: 300), GetApplicationEventTarget(), 0, &escHotKey)
     } else if !on, let ref = escHotKey {
@@ -472,51 +465,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// ⌘⌥Space: bare digits press the numbered keys until a choice is made or 4 s pass.
-  func startPicking() {
-    if !panel.isVisible { panel.orderFrontRegardless() }
-    if minimized { expand() }
-    if !picking {
-      picking = true
-      for (n, key) in AppDelegate.numberKeys.enumerated() {
-        var ref: EventHotKeyRef?
-        RegisterEventHotKey(UInt32(key), 0, EventHotKeyID(signature: OSType(0x5344_4B31), id: UInt32(200 + n)), GetApplicationEventTarget(), 0, &ref)
-        if let ref { digitHotKeys.append(ref) }
-      }
-      updateEscape()
-      panel.contentView?.layer?.borderWidth = 3
-      panel.contentView?.layer?.borderColor = NSColor(red: 0.25, green: 0.77, blue: 1, alpha: 0.9).cgColor
-      panel.contentView?.layer?.cornerRadius = 20
-    }
-    touchPicking()
-  }
-  func touchPicking() {
-    pickTimer?.invalidate()
-    pickTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in self?.stopPicking() }
-  }
-  func stopPicking() {
-    guard picking else { return }
-    picking = false
-    pickTimer?.invalidate()
-    digitHotKeys.forEach { UnregisterEventHotKey($0) }
-    digitHotKeys = []
-    updateEscape()
-    panel.contentView?.layer?.borderWidth = 0
-  }
+
 
   func hotKeyEvent(id: UInt32, pressed: Bool) {
     if id == 1 { if pressed { toggle() }; return }
-    if id == 2 { if pressed { startPicking() }; return }
-    if id == 300 {  // Esc: back while a drawer is open, otherwise leave pick mode
-      guard !pressed else { return }
-      if drawerOpen { host.send(["t": "num", "n": 0, "down": false]); touchPicking() } else { stopPicking() }
-      return
-    }
-    if id >= 200 {  // a digit in pick mode
-      host.send(["t": "num", "n": Int(id) - 200, "down": pressed])
-      if pressed { touchPicking() }
-      return
-    }
+    if id == 300 { if !pressed { host.send(["t": "num", "n": 0, "down": false]) }; return }  // Esc (only while a drawer is open)
+    if id >= 200 { host.send(["t": "num", "n": Int(id) - 200, "down": pressed]); return }   // ⌃0 … ⌃9
     let slot = Int(id) - 100, row = slot / 8, col = slot % 8
     guard col < columns else { return }
     let i = row * columns + col
@@ -539,7 +493,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let sig = OSType(0x5344_4B31)  // "SDK1"
     var ref: EventHotKeyRef?
     RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey | controlKey), EventHotKeyID(signature: sig, id: 1), GetApplicationEventTarget(), 0, &ref)
-    RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey), EventHotKeyID(signature: sig, id: 2), GetApplicationEventTarget(), 0, &ref)
+    for (n, key) in AppDelegate.numberKeys.enumerated() {
+      RegisterEventHotKey(UInt32(key), UInt32(controlKey), EventHotKeyID(signature: sig, id: UInt32(200 + n)), GetApplicationEventTarget(), 0, &ref)
+    }
     for (r, row) in AppDelegate.rowKeys.enumerated() {
       for (c, key) in row.enumerated() {
         RegisterEventHotKey(UInt32(key), UInt32(controlKey | optionKey), EventHotKeyID(signature: sig, id: UInt32(100 + r * 8 + c)), GetApplicationEventTarget(), 0, &ref)

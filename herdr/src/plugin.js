@@ -83,7 +83,7 @@ function renderKey(k, now = Date.now()) {
     if (k.peekUntil > now) return paint(k, peekImage(tab));
     const flashing = tab && (state.flashUntil.get(tab.id) ?? 0) > now;
     const on = flashing && Math.floor(now / 500) % 2 === 0;
-    return paint(k, slotImage(tab, { flash: on, doneSince: tab && state.doneSince.get(tab.id), now, style: config.style, pulse: Math.floor(now / 1000) % 2 }));
+    return paint(k, slotImage(tab, { flash: on, doneSince: tab && state.doneSince.get(tab.id), now, style: config.style, pulse: Math.floor(now / 1000) % 2, theme: k.theme }));
   }
   if (k.kind === "needs") {
     const waiting = state.tabs.filter((t) => WAITING.has(t.status));
@@ -170,7 +170,7 @@ class Base extends SingletonAction {
   onWillAppear(ev) {
     const slot = Number(ev.payload.settings?.slot) || 1;
     const s = ev.payload.settings ?? {};
-    const k = { action: ev.action, device: ev.action.device?.id ?? "deck", kind: this.kind, slot, active: s.show === "active", pin: [].concat(s.pin ?? []), lastImage: null, peekUntil: 0, downAt: 0 };
+    const k = { action: ev.action, device: ev.action.device?.id ?? "deck", kind: this.kind, slot, theme: s.theme ?? "", active: s.show === "active", pin: [].concat(s.pin ?? []), lastImage: null, peekUntil: 0, downAt: 0 };
     keys.set(ev.action.id, k);
     streamDeck.logger.info(`appear ${this.kind}${this.kind === "slot" ? ` #${slot}` : ""} (${keys.size} visible)`);
     return renderKey(k);

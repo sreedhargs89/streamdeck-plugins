@@ -9,10 +9,9 @@ dictation on/off) look and behave exactly like on the hardware.
 - **Folders open as a drawer**: your main keys never move; a folder adds 1–2 rows below them (framed in blue
   while open — click it again to close, or another folder to switch). Folders inside folders open in the drawer
   with ◀ Back (long-press = close). Plugin keys in the drawer get willAppear/willDisappear like on a real deck.
-- **Pick mode — ⌘⌥Space**: number badges show on the folders; press a plain **1 … 9** to open one, and the badges
-  move to its drawer so the next digit presses a key there (⌘⌥Space, 4, 2 = Prompts → Reply simple). **0 / Esc** = back.
-  Digits are only taken during pick mode (ends after a non-folder key, Esc with nothing open, or 4 s idle) — otherwise
-  they type normally. Row 2 also has ⌃⌥Q … ⌃⌥I by position; holding a key holds it (hold-to-talk works).
+- **Number keys — ⌃1 … ⌃9**: folders carry a number badge; ⌃4 opens folder 4, then the badges move to its drawer so
+  ⌃2 presses its 2nd key. **Esc** (only while a drawer is open) or ⌃0 = back. Row 2 also has ⌃⌥Q … ⌃⌥I by position;
+  holding a key holds it (hold-to-talk works).
 - 🔴 close hides the deck (⌃⌥⌘Space or the menu-bar brings it back); 🟡 minimize shrinks it to a 🎛 pill — click
   the pill to expand, drag it to move.
 - Menu-bar 🎛: Show/Hide, Home, Edit Keys…, Reload, Launch at Login, Quit.
@@ -47,6 +46,12 @@ Marketplace plugins (Spotify, Voicemod…) are tied to Elgato's app and aren't s
 
 Keys fill left-to-right, top-to-bottom. `icon` paths are relative to `~/.config/sree-deck/`. After editing,
 use **Reload** in the menu-bar. `text` keys paste the text (clipboard is restored) and press Enter if `enter`.
+
+## Quiet look
+
+`python3 scripts/quiet-deck.py` re-skins `deck.json`: 8 main keys + folders (Prompts, Agents, Work), every static key
+an SF Symbol in white on grey (`scripts/quiet-icons.swift`), colour only for live state. The previous deck is kept as
+`deck.colourful.json`; the colourful code is tagged `sree-deck-colourful-20261031`.
 
 ## Import folders from a Stream Deck profile
 

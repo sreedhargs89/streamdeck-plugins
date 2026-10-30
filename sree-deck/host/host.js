@@ -75,7 +75,7 @@ function render() {
   }
 }
 
-// ---------- number keys (⌘⌥Space, then 1…9): folders when the drawer is closed, the drawer's keys when it's open ----------
+// ---------- number keys (⌃1…9): folders when the drawer is closed, the drawer's keys when it's open ----------
 function numbered() {
   const list = stack.length
     ? keys.filter((k) => k.i >= mainCount() && k.cfg.type !== "back" && Object.keys(k.cfg).length)
@@ -313,11 +313,9 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   try { m = JSON.parse(line); } catch { return; }
   if (m.t === "down" || m.t === "up") press(m.i, m.t === "down");
   else if (m.t === "num") {
-    if (m.n === 0) { if (!m.down && stack.length) { stack.pop(); render(); } return; } // 0 / Esc: back / close
+    if (m.n === 0) { if (!m.down && stack.length) { stack.pop(); render(); } return; } // ⌃0 / Esc: back / close
     const k = numbered()[m.n - 1];
     if (k) press(k.i, !!m.down);
-    // pick mode continues after opening a folder (so "4 then 2" works); any other key ends it
-    if (!m.down) send({ t: "pick", stay: !!k && k.cfg.type === "folder" });
   }
   else if (m.t === "home") { stack = []; render(); }
   else if (m.t === "reload") { shutdown(); boot(); }

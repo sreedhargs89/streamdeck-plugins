@@ -83,7 +83,7 @@ export function tile({ image, title, emoji, bg = "#1c1f24" }) {
 
 /** What a key shows before (or without) a plugin drawing it. */
 export function keyImage(cfg, state = 0) {
-  if (cfg.type === "back") return tile({ emoji: "◀", title: "Back", bg: "#37474F" });
+  if (cfg.type === "back") return tile({ emoji: "◀", title: "Back", bg: "#24282e" });
   const icons = [].concat(cfg.icons ?? cfg.icon ?? []);
   const image = asDataUri(icons[Math.min(state, icons.length - 1)] && file(icons[Math.min(state, icons.length - 1)])) ?? pluginImage(cfg, state);
   const title = cfg.showTitle === false ? "" : cfg.title;
