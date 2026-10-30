@@ -45,7 +45,11 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 </dict></plist>
 EOF
 
-codesign --force --deep -s - "$APP" >/dev/null
+# Sign with a stable identity when there is one (an Apple Development cert), so macOS keeps the Accessibility
+# grant across rebuilds; ad-hoc (-) otherwise, which makes macOS ask again after every rebuild.
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development|Developer ID Application/ {print $2; exit}')
+codesign --force --deep -s "${IDENTITY:--}" "$APP" >/dev/null 2>&1 || codesign --force --deep -s - "$APP" >/dev/null
+echo "signed with: ${IDENTITY:-ad-hoc}"
 pkill -x SreeDeck 2>/dev/null || true
 mkdir -p ~/Applications && rm -rf ~/Applications/"Sree Deck.app" && cp -R "$APP" ~/Applications/
 open ~/Applications/"Sree Deck.app"

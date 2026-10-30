@@ -227,9 +227,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     host.start()
     setupMenu()
     registerHotKey()
-    // typing prompts and pressing shortcuts for you needs Accessibility; ask once (macOS shows its own dialog)
-    let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-    _ = AXIsProcessTrustedWithOptions(opts)
+    // Typing prompts and pressing shortcuts needs Accessibility. Ask macOS only once ever; after that, a missing
+    // permission just shows in the menu-bar menu (the app is signed with a stable identity, so a grant survives rebuilds).
+    if !AXIsProcessTrusted() && !UserDefaults.standard.bool(forKey: "askedAccessibility") {
+      UserDefaults.standard.set(true, forKey: "askedAccessibility")
+      let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+      _ = AXIsProcessTrustedWithOptions(opts)
+    }
   }
 
   func applicationWillTerminate(_ n: Notification) { host.stop() }
@@ -297,6 +301,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     status.button?.title = "🎛"
     let menu = NSMenu()
+    if !AXIsProcessTrusted() {
+      menu.addItem(withTitle: "⚠️ Allow Accessibility (for typing keys)…", action: #selector(openAccessibility), keyEquivalent: "")
+      menu.addItem(.separator())
+    }
     menu.addItem(withTitle: "Show / Hide  (⌃⌥⌘Space)", action: #selector(toggle), keyEquivalent: "")
     menu.addItem(withTitle: "Home", action: #selector(home), keyEquivalent: "")
     menu.addItem(withTitle: "Edit Keys…", action: #selector(editKeys), keyEquivalent: "")
@@ -340,6 +348,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @objc func reload() { host.send(["t": "reload"]) }
   @objc func home() { host.send(["t": "home"]) }
   @objc func quit() { NSApp.terminate(nil) }
+  @objc func openAccessibility() {
+    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+  }
   @objc func toggleLogin(_ item: NSMenuItem) {
     let svc = SMAppService.mainApp
     try? (svc.status == .enabled ? svc.unregister() : svc.register())
