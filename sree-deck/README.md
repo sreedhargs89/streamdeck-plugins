@@ -39,12 +39,14 @@ Marketplace plugins (Spotify, Voicemod…) are tied to Elgato's app and aren't s
     { "type": "keys", "keys": ["58+18"] },
     { "type": "volume", "do": "up" },
     { "type": "arc", "space": "it-ops-asahi" },
+    { "type": "quad", "icon": "icons/quiet/quad-main.png", "keys": [ {…top-left}, {…top-right}, {…bottom-left}, {…bottom-right} ] },
     { "type": "folder", "title": "Work", "icon": "icons/work.png", "keys": [ … ] }
   ]
 }
 ```
 
-Keys fill left-to-right, top-to-bottom. `icon` paths are relative to `~/.config/sree-deck/`. After editing,
+A `quad` key is four small keys in one: the app sends which quarter you clicked (draw its icon with a `quad` spec in
+`scripts/quiet-icons.swift`). Keys fill left-to-right, top-to-bottom. `icon` paths are relative to `~/.config/sree-deck/`. After editing,
 use **Reload** in the menu-bar. `text` keys paste the text (clipboard is restored) and press Enter if `enter`.
 
 ## Quiet look

@@ -268,8 +268,14 @@ async function builtin(k) {
 }
 
 // ---------- input from the app ----------
-function press(i, down) {
-  const k = keys[i];
+function press(i, down, q = 0) {
+  let k = keys[i];
+  // a split key: four small keys in one; the app tells us which quarter was clicked
+  if (k?.cfg.type === "quad") {
+    const sub = k.cfg.keys?.[q];
+    if (!sub || down) return;
+    return builtin({ cfg: sub }).then((did) => did && send({ t: "flash", i, kind: "ok" })).catch((e) => { log(`key ${i}.${q}: ${e.message}`); send({ t: "flash", i, kind: "alert" }); });
+  }
   if (existsSync(join(homedir(), ".config/sree-deck/debug"))) log(`press ${i} ${down ? "down" : "up"} page=${pagePath()} key=${k?.cfg.type ?? k?.cfg.action}`);
   if (!k) return;
   if (down) downAt.set(i, Date.now());
@@ -311,7 +317,7 @@ function shutdown() {
 createInterface({ input: process.stdin }).on("line", (line) => {
   let m;
   try { m = JSON.parse(line); } catch { return; }
-  if (m.t === "down" || m.t === "up") press(m.i, m.t === "down");
+  if (m.t === "down" || m.t === "up") press(m.i, m.t === "down", m.q ?? 0);
   else if (m.t === "num") {
     if (m.n === 0) { if (!m.down && stack.length) { stack.pop(); render(); } return; } // ⌃0 / Esc: back / close
     const k = numbered()[m.n - 1];

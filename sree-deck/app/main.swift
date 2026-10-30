@@ -17,7 +17,8 @@ let bar: CGFloat = 16  // strip along the top for the close / minimize buttons
 
 final class KeyView: NSView {
   let index: Int
-  var onPress: ((Int, Bool) -> Void)?
+  var onPress: ((Int, Bool, Int) -> Void)?  // index, down, quadrant (0 TL, 1 TR, 2 BL, 3 BR — for split keys)
+  private var downQuadrant = 0
   private let imageLayer = CALayer()
   private let flashLayer = CATextLayer()
   private let badge = CATextLayer()
@@ -81,11 +82,13 @@ final class KeyView: NSView {
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
   override func mouseDown(with event: NSEvent) {
     layer?.transform = CATransform3DMakeScale(0.93, 0.93, 1)
-    onPress?(index, true)
+    let p = convert(event.locationInWindow, from: nil)
+    downQuadrant = (p.x > bounds.midX ? 1 : 0) + (p.y < bounds.midY ? 2 : 0)
+    onPress?(index, true, downQuadrant)
   }
   override func mouseUp(with event: NSEvent) {
     layer?.transform = CATransform3DIdentity
-    onPress?(index, false)
+    onPress?(index, false, downQuadrant)
   }
 }
 
@@ -325,7 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       let k = KeyView(index: i)
       let c = i % columns, r = i / columns
       k.frame.origin = NSPoint(x: pad + CGFloat(c) * (keySize + gap), y: h - pad - bar - keySize - CGFloat(r) * (keySize + gap))
-      k.onPress = { [weak self] i, down in self?.host.send(["t": down ? "down" : "up", "i": i]) }
+      k.onPress = { [weak self] i, down, q in self?.host.send(["t": down ? "down" : "up", "i": i, "q": q]) }
       k.setImage(images[i])
       k.setBadge(badges[i] ?? 0)
       k.setOpen(i == openFolder)
