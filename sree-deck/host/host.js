@@ -16,7 +16,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } fr
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { WebSocketServer } from "ws";
-import { loadDeck, pageKeys, drawerKeys, pluginsIn, pluginDir, keyImage, outlined, CONFIG } from "./deck.js";
+import { loadDeck, pageKeys, drawerKeys, pluginsIn, pluginDir, keyImage, CONFIG } from "./deck.js";
 import { toPng } from "./render.js";
 
 const DEVICE = "sree-deck";
@@ -66,21 +66,42 @@ function render() {
   const rowsChanged = !keys.length || keys.length !== next.length;
   keys = next;
   if (rowsChanged) send({ t: "layout", columns: deck.columns, rows: deck.rows + drawerRows });
+  send({ t: "drawer", open: stack.length > 0 }); // the app takes Esc (= back) only while a drawer is open
+  sendMarks();
   for (const k of keys) {
     const stayed = before.has(k.context);
-    if (!stayed || k.i >= mainCount() || k.cfg.type === "folder" || rowsChanged) paintDefault(k, stayed && k.cfg.plugin);
+    if (!stayed || k.i >= mainCount()) paintDefault(k, stayed && !!k.cfg.plugin);
     if (k.cfg.plugin && !stayed) toPlugin(k, "willAppear");
   }
 }
 
+// ---------- number keys (⌘⌥Space, then 1…9): folders when the drawer is closed, the drawer's keys when it's open ----------
+function numbered() {
+  const list = stack.length
+    ? keys.filter((k) => k.i >= mainCount() && k.cfg.type !== "back" && Object.keys(k.cfg).length)
+    : keys.filter((k) => k.cfg.type === "folder");
+  return list.slice(0, 9);
+}
+const numberOf = (k) => { const n = numbered().indexOf(k); return n < 0 ? 0 : n + 1; };
+
+/** Sends a key image (badges and the open-folder frame are drawn by the app on top). */
+function show(k, png) {
+  if (keys[k.i] === k) send({ t: "img", i: k.i, png });
+}
+
+/** Tells the app which keys carry a number badge and which folder is open. */
+function sendMarks() {
+  const badges = {};
+  numbered().forEach((k, n) => (badges[k.i] = n + 1));
+  send({ t: "marks", badges, open: stack[0]?.i ?? -1 });
+}
+
 function paintDefault(k, keepPluginImage = false) {
-  if (keepPluginImage && k.lastPng) return send({ t: "img", i: k.i, png: k.lastPng }); // plugin keys keep their live image
+  if (keepPluginImage && k.lastPng) return show(k, k.lastPng); // plugin keys keep their live image
   const img = keyImage(k.cfg, keyState.get(k.context).state);
   if (!img) return send({ t: "img", i: k.i, png: "" });
-  const open = stack[0]?.i === k.i; // the folder whose drawer is open gets a frame (drawn over the flattened tile)
   toPng(img)
-    .then((png) => (open ? toPng(outlined(`data:image/png;base64,${png}`)) : png))
-    .then((png) => keys[k.i] === k && send({ t: "img", i: k.i, png }))
+    .then((png) => { if (k.cfg.plugin) k.lastPng = png; show(k, png); })
     .catch((e) => log(`image ${k.i}: ${e.message}`));
 }
 
@@ -145,7 +166,7 @@ function fromPlugin(ws, m) {
     case "setImage":
       if (!k) return;
       if (!m.payload?.image) return paintDefault(k);
-      return toPng(m.payload.image).then((png) => { k.lastPng = png; if (keys[k.i] === k) send({ t: "img", i: k.i, png }); }).catch((e) => log(`render ${k.i}: ${e.message}`));
+      return toPng(m.payload.image).then((png) => { k.lastPng = png; show(k, png); }).catch((e) => log(`render ${k.i}: ${e.message}`));
     case "setState":
       if (!st) return;
       st.state = m.payload?.state ?? 0;
@@ -188,7 +209,24 @@ const run = (bin, args, input) => new Promise((resolve) => {
   const p = execFile(bin, args, { timeout: 5000 }, () => resolve());
   if (input !== undefined) { p.stdin.write(input); p.stdin.end(); }
 });
-const pressKeys = (...combos) => (KEYS_BIN ? run(KEYS_BIN, ["tap", ...combos]) : log("keys helper missing (build the wispr plugin)"));
+// Key presses are done by the Sree Deck app itself (it holds the Accessibility grant; helpers it starts may not).
+const toCombos = (list) => list.map((c) => String(c).split("+").map(Number));
+const sendKeys = (mode, combos) => send({ t: "keys", mode, combos: toCombos(combos) });
+const pressKeys = async (...combos) => { sendKeys("tap", combos); await new Promise((r) => setTimeout(r, 30 + combos.length * 30)); };
+
+// Wispr Shortcut keys ("opt+1", "fn", "ctrl+e, (ctrl+u, delete)*40") — same syntax as the Wispr Keys plugin
+const NAMES = { delete: 51, backspace: 51, fn: 63, ctrl: 59, control: 59, opt: 58, option: 58, alt: 58, cmd: 55, command: 55, shift: 56, space: 49, esc: 53, enter: 36 };
+const LETTERS = "asdfhgzxcv_bqweryt123465=97-80]ou[ip_lj'k;\\,/nm.";
+for (let i = 0; i < LETTERS.length; i++) if (LETTERS[i] !== "_" && !(LETTERS[i] in NAMES)) NAMES[LETTERS[i]] = i;
+const toCodes = (combo) => String(combo).toLowerCase().split("+").map((p) => p.trim()).filter(Boolean).map((p) => (/^\d+$/.test(p) && Number(p) > 9 ? Number(p) : NAMES[p] ?? (() => { throw new Error(`unknown key "${p}"`); })())).join("+");
+function toSequence(spec) {
+  const out = [];
+  for (const m of String(spec).matchAll(/\(([^)]*)\)\s*\*\s*(\d+)|([^,()]+)/g)) {
+    if (m[1] !== undefined) { const g = toSequence(m[1]); for (let i = 0; i < Math.min(Number(m[2]), 200); i++) out.push(...g); }
+    else if (m[3].trim()) out.push(toCodes(m[3]));
+  }
+  return out;
+}
 const osa = (script) => run("/usr/bin/osascript", ["-e", script]);
 
 async function builtin(k) {
@@ -235,6 +273,14 @@ function press(i, down) {
   if (existsSync(join(homedir(), ".config/sree-deck/debug"))) log(`press ${i} ${down ? "down" : "up"} page=${pagePath()} key=${k?.cfg.type ?? k?.cfg.action}`);
   if (!k) return;
   if (down) downAt.set(i, Date.now());
+  if (k.cfg.action === "com.sree.wispr.keys") {
+    const { keys: spec, hold } = keyState.get(k.context).settings;
+    try {
+      if (hold) sendKeys(down ? "down" : "up", [toCodes(spec)]);
+      else if (!down) sendKeys("tap", toSequence(spec));
+    } catch (e) { log(`key ${i}: ${e.message}`); send({ t: "flash", i, kind: "alert" }); }
+    return;
+  }
   if (k.cfg.plugin) return toPlugin(k, down ? "keyDown" : "keyUp");
   if (down) return;
   if (k.cfg.type === "folder" || k.cfg.type === "back") {
@@ -266,6 +312,13 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   let m;
   try { m = JSON.parse(line); } catch { return; }
   if (m.t === "down" || m.t === "up") press(m.i, m.t === "down");
+  else if (m.t === "num") {
+    if (m.n === 0) { if (!m.down && stack.length) { stack.pop(); render(); } return; } // 0 / Esc: back / close
+    const k = numbered()[m.n - 1];
+    if (k) press(k.i, !!m.down);
+    // pick mode continues after opening a folder (so "4 then 2" works); any other key ends it
+    if (!m.down) send({ t: "pick", stay: !!k && k.cfg.type === "folder" });
+  }
   else if (m.t === "home") { stack = []; render(); }
   else if (m.t === "reload") { shutdown(); boot(); }
 });

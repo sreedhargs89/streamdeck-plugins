@@ -20,6 +20,7 @@ final class KeyView: NSView {
   var onPress: ((Int, Bool) -> Void)?
   private let imageLayer = CALayer()
   private let flashLayer = CATextLayer()
+  private let badge = CATextLayer()
 
   init(index: Int) {
     self.index = index
@@ -37,6 +38,30 @@ final class KeyView: NSView {
     flashLayer.contentsScale = 2
     flashLayer.opacity = 0
     layer?.addSublayer(flashLayer)
+    badge.frame = NSRect(x: 5, y: keySize - 27, width: 22, height: 22)
+    badge.cornerRadius = 11
+    badge.backgroundColor = NSColor(white: 0, alpha: 0.75).cgColor
+    badge.borderColor = NSColor(white: 1, alpha: 0.85).cgColor
+    badge.borderWidth = 1.5
+    badge.fontSize = 14
+    badge.font = NSFont.systemFont(ofSize: 14, weight: .heavy)
+    badge.foregroundColor = NSColor.white.cgColor
+    badge.alignmentMode = .center
+    badge.contentsScale = 2
+    badge.isHidden = true
+    layer?.addSublayer(badge)
+  }
+
+  /// Number badge for ⌃1…9 (0 = none).
+  func setBadge(_ n: Int) {
+    badge.isHidden = n == 0
+    badge.string = n == 0 ? "" : "\(n)"
+  }
+
+  /// Blue frame on the folder whose drawer is open.
+  func setOpen(_ open: Bool) {
+    layer?.borderWidth = open ? 4 : 0
+    layer?.borderColor = NSColor(red: 0.25, green: 0.77, blue: 1, alpha: 1).cgColor
   }
   required init?(coder: NSCoder) { fatalError() }
 
@@ -62,6 +87,47 @@ final class KeyView: NSView {
     layer?.transform = CATransform3DIdentity
     onPress?(index, false)
   }
+}
+
+// MARK: - Pressing keys (done here: this app is the one with the Accessibility grant)
+
+enum KeyPoster {
+  static let modifierFlags: [CGKeyCode: CGEventFlags] = [
+    54: .maskCommand, 55: .maskCommand, 56: .maskShift, 60: .maskShift,
+    58: .maskAlternate, 61: .maskAlternate, 59: .maskControl, 62: .maskControl, 63: .maskSecondaryFn,
+  ]
+  static var held: CGEventFlags = []
+  static let source = CGEventSource(stateID: .hidSystemState)
+  static let queue = DispatchQueue(label: "sreedeck.keys", qos: .userInteractive)
+
+  /// Modifiers are sent as their own key events (not just flags), so apps that watch raw key codes see them; Fn works too.
+  static func post(_ code: CGKeyCode, down: Bool, pause: useconds_t) {
+    guard let e = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else { return }
+    if let f = modifierFlags[code] {
+      if down { held.insert(f) } else { held.remove(f) }
+      e.type = .flagsChanged
+    }
+    e.flags = held
+    e.post(tap: .cghidEventTap)
+    usleep(pause)
+  }
+  /// mode: "tap" (each combo pressed and released in turn), "down" or "up" (hold / release one combo)
+  static func run(mode: String, combos: [[Int]]) {
+    let pause: useconds_t = combos.count > 4 ? 3_000 : 12_000
+    for combo in combos {
+      let codes = combo.map { CGKeyCode($0) }
+      if mode != "up" { codes.forEach { post($0, down: true, pause: pause) } }
+      if mode != "down" { codes.reversed().forEach { post($0, down: false, pause: pause) } }
+    }
+  }
+}
+
+func appLog(_ msg: String) {
+  let dir = NSHomeDirectory() + "/Library/Logs/SreeDeck"
+  try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+  let line = "\(ISO8601DateFormatter().string(from: Date())) \(msg)\n"
+  if let h = FileHandle(forWritingAtPath: dir + "/app.log") { h.seekToEndOfFile(); h.write(Data(line.utf8)); h.closeFile() }
+  else { try? line.write(toFile: dir + "/app.log", atomically: true, encoding: .utf8) }
 }
 
 // MARK: - Window buttons (close / minimize) and the minimized pill
@@ -196,6 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var panel: DeckPanel!
   var keys: [KeyView] = []
   var images: [Int: NSImage] = [:]
+  var badges: [Int: Int] = [:]
+  var openFolder = -1
   let host = Host()
   var status: NSStatusItem!
   var dims = (columns: 4, rows: 2)
@@ -217,6 +285,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     panel.hasShadow = true
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
     panel.contentView = Background()
+    panel.contentView?.wantsLayer = true
     layout(columns: 4, rows: 2)
     restorePosition()
     pill.onClick = { [weak self] in self?.expand() }
@@ -229,6 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     registerHotKey()
     // Typing prompts and pressing shortcuts needs Accessibility. Ask macOS only once ever; after that, a missing
     // permission just shows in the menu-bar menu (the app is signed with a stable identity, so a grant survives rebuilds).
+    appLog("launched; Accessibility trusted = \(AXIsProcessTrusted()); signed id \(Bundle.main.bundleIdentifier ?? "?")")
     if !AXIsProcessTrusted() && !UserDefaults.standard.bool(forKey: "askedAccessibility") {
       UserDefaults.standard.set(true, forKey: "askedAccessibility")
       let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -257,6 +327,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       k.frame.origin = NSPoint(x: pad + CGFloat(c) * (keySize + gap), y: h - pad - bar - keySize - CGFloat(r) * (keySize + gap))
       k.onPress = { [weak self] i, down in self?.host.send(["t": down ? "down" : "up", "i": i]) }
       k.setImage(images[i])
+      k.setBadge(badges[i] ?? 0)
+      k.setOpen(i == openFolder)
       panel.contentView?.addSubview(k)
       keys.append(k)
     }
@@ -276,6 +348,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     case "flash":
       guard let i = m["i"] as? Int, i < keys.count else { return }
       keys[i].flash(ok: (m["kind"] as? String) == "ok")
+    case "drawer":
+      drawerOpen = m["open"] as? Bool ?? false
+      updateEscape()
+    case "pick":
+      if (m["stay"] as? Bool) == true { touchPicking() } else { stopPicking() }
+    case "marks":
+      badges = [:]
+      for (k, v) in (m["badges"] as? [String: Int]) ?? [:] { if let i = Int(k) { badges[i] = v } }
+      openFolder = m["open"] as? Int ?? -1
+      for (i, k) in keys.enumerated() { k.setBadge(badges[i] ?? 0); k.setOpen(i == openFolder) }
+    case "keys":
+      let combos = (m["combos"] as? [[Int]]) ?? []
+      let mode = m["mode"] as? String ?? "tap"
+      if !AXIsProcessTrusted() { appLog("keys \(mode) \(combos): NOT trusted for Accessibility") }
+      KeyPoster.queue.async { KeyPoster.run(mode: mode, combos: combos) }  // one queue: paste, then Enter, in order
     case "log":
       NSLog("SreeDeck host: %@", m["msg"] as? String ?? "")
     default: break
@@ -359,15 +446,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: global hotkeys (Carbon: no Accessibility permission needed)
   //   ⌃⌥⌘Space  show/hide
-  //   ⌃⌥1 … ⌃⌥8  press the keys in row 1;  ⌃⌥Q … ⌃⌥I  row 2  (held = key held, so hold-to-talk works)
+  //   ⌘⌥Space    pick mode: then plain 1 … 9 press the numbered keys (badges) — folders when the drawer is closed,
+  //              the drawer's keys when it's open; 0 / Esc = back. Digits are only captured during pick mode
+  //              (ends after a non-folder key, Esc with nothing open, or 4 s idle). Esc = back while a drawer is open.
+  //   ⌃⌥Q … ⌃⌥I  press the keys in row 2 by position  (held = key held, so hold-to-talk works)
   static let rowKeys: [[Int]] = [
-    [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8],
+    [],
     [kVK_ANSI_Q, kVK_ANSI_W, kVK_ANSI_E, kVK_ANSI_R, kVK_ANSI_T, kVK_ANSI_Y, kVK_ANSI_U, kVK_ANSI_I],
   ]
+  static let numberKeys = [kVK_ANSI_0, kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9]
   var columns = 4
+  var escHotKey: EventHotKeyRef?
+  var drawerOpen = false
+  var picking = false
+  var digitHotKeys: [EventHotKeyRef] = []
+  var pickTimer: Timer?
+
+  /// Esc is taken only while a drawer is open or pick mode is on; otherwise it's left alone for every other app.
+  func updateEscape() {
+    let on = drawerOpen || picking
+    if on, escHotKey == nil {
+      RegisterEventHotKey(UInt32(kVK_Escape), 0, EventHotKeyID(signature: OSType(0x5344_4B31), id: 300), GetApplicationEventTarget(), 0, &escHotKey)
+    } else if !on, let ref = escHotKey {
+      UnregisterEventHotKey(ref); escHotKey = nil
+    }
+  }
+
+  /// ⌘⌥Space: bare digits press the numbered keys until a choice is made or 4 s pass.
+  func startPicking() {
+    if !panel.isVisible { panel.orderFrontRegardless() }
+    if minimized { expand() }
+    if !picking {
+      picking = true
+      for (n, key) in AppDelegate.numberKeys.enumerated() {
+        var ref: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(key), 0, EventHotKeyID(signature: OSType(0x5344_4B31), id: UInt32(200 + n)), GetApplicationEventTarget(), 0, &ref)
+        if let ref { digitHotKeys.append(ref) }
+      }
+      updateEscape()
+      panel.contentView?.layer?.borderWidth = 3
+      panel.contentView?.layer?.borderColor = NSColor(red: 0.25, green: 0.77, blue: 1, alpha: 0.9).cgColor
+      panel.contentView?.layer?.cornerRadius = 20
+    }
+    touchPicking()
+  }
+  func touchPicking() {
+    pickTimer?.invalidate()
+    pickTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: false) { [weak self] _ in self?.stopPicking() }
+  }
+  func stopPicking() {
+    guard picking else { return }
+    picking = false
+    pickTimer?.invalidate()
+    digitHotKeys.forEach { UnregisterEventHotKey($0) }
+    digitHotKeys = []
+    updateEscape()
+    panel.contentView?.layer?.borderWidth = 0
+  }
 
   func hotKeyEvent(id: UInt32, pressed: Bool) {
     if id == 1 { if pressed { toggle() }; return }
+    if id == 2 { if pressed { startPicking() }; return }
+    if id == 300 {  // Esc: back while a drawer is open, otherwise leave pick mode
+      guard !pressed else { return }
+      if drawerOpen { host.send(["t": "num", "n": 0, "down": false]); touchPicking() } else { stopPicking() }
+      return
+    }
+    if id >= 200 {  // a digit in pick mode
+      host.send(["t": "num", "n": Int(id) - 200, "down": pressed])
+      if pressed { touchPicking() }
+      return
+    }
     let slot = Int(id) - 100, row = slot / 8, col = slot % 8
     guard col < columns else { return }
     let i = row * columns + col
@@ -390,6 +539,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let sig = OSType(0x5344_4B31)  // "SDK1"
     var ref: EventHotKeyRef?
     RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey | controlKey), EventHotKeyID(signature: sig, id: 1), GetApplicationEventTarget(), 0, &ref)
+    RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | optionKey), EventHotKeyID(signature: sig, id: 2), GetApplicationEventTarget(), 0, &ref)
     for (r, row) in AppDelegate.rowKeys.enumerated() {
       for (c, key) in row.enumerated() {
         RegisterEventHotKey(UInt32(key), UInt32(controlKey | optionKey), EventHotKeyID(signature: sig, id: UInt32(100 + r * 8 + c)), GetApplicationEventTarget(), 0, &ref)

@@ -9,8 +9,10 @@ dictation on/off) look and behave exactly like on the hardware.
 - **Folders open as a drawer**: your main keys never move; a folder adds 1–2 rows below them (framed in blue
   while open — click it again to close, or another folder to switch). Folders inside folders open in the drawer
   with ◀ Back (long-press = close). Plugin keys in the drawer get willAppear/willDisappear like on a real deck.
-- **Hotkeys** press whatever key sits at that spot on the current page — row 1: ⌃⌥1 … ⌃⌥8, row 2: ⌃⌥Q … ⌃⌥I (main keys)
-  (holding the hotkey holds the key, so hold-to-talk works from the keyboard).
+- **Pick mode — ⌘⌥Space**: number badges show on the folders; press a plain **1 … 9** to open one, and the badges
+  move to its drawer so the next digit presses a key there (⌘⌥Space, 4, 2 = Prompts → Reply simple). **0 / Esc** = back.
+  Digits are only taken during pick mode (ends after a non-folder key, Esc with nothing open, or 4 s idle) — otherwise
+  they type normally. Row 2 also has ⌃⌥Q … ⌃⌥I by position; holding a key holds it (hold-to-talk works).
 - 🔴 close hides the deck (⌃⌥⌘Space or the menu-bar brings it back); 🟡 minimize shrinks it to a 🎛 pill — click
   the pill to expand, drag it to move.
 - Menu-bar 🎛: Show/Hide, Home, Edit Keys…, Reload, Launch at Login, Quit.
@@ -61,6 +63,10 @@ with "More ▶". Paste the output into `deck.json`.
 ```bash
 ./scripts/build-app.sh     # compiles, bundles the host, installs ~/Applications/Sree Deck.app and launches it
 ```
+
+Key presses (paste, Enter, Wispr shortcuts) are made by the app itself, which holds the Accessibility grant;
+builds are signed with your Apple Development identity so the grant survives rebuilds (`~/Library/Logs/SreeDeck/app.log`
+shows `Accessibility trusted = true/false` at launch).
 
 For development, `defaults write com.sree.deck HostPath <repo>/sree-deck/host/host.js` makes the app run the
 host from the repo, so host changes only need Reload (no rebuild, no new Accessibility prompt). Host log:
