@@ -11,6 +11,7 @@ import ServiceManagement
 let keySize: CGFloat = 88
 let gap: CGFloat = 10
 let pad: CGFloat = 12
+let bar: CGFloat = 16  // strip along the top for the close / minimize buttons
 
 // MARK: - Key view
 
@@ -63,6 +64,52 @@ final class KeyView: NSView {
   }
 }
 
+// MARK: - Window buttons (close / minimize) and the minimized pill
+
+final class WindowButton: NSView {
+  let color: NSColor, symbol: String, action: () -> Void
+  private var hover = false
+  init(color: NSColor, symbol: String, action: @escaping () -> Void) {
+    self.color = color; self.symbol = symbol; self.action = action
+    super.init(frame: NSRect(x: 0, y: 0, width: 13, height: 13))
+    addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+  }
+  required init?(coder: NSCoder) { fatalError() }
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+  override func mouseEntered(with e: NSEvent) { hover = true; needsDisplay = true }
+  override func mouseExited(with e: NSEvent) { hover = false; needsDisplay = true }
+  override func mouseDown(with e: NSEvent) {}
+  override func mouseUp(with e: NSEvent) { if bounds.contains(convert(e.locationInWindow, from: nil)) { action() } }
+  override func draw(_ r: NSRect) {
+    color.setFill(); NSBezierPath(ovalIn: bounds.insetBy(dx: 0.5, dy: 0.5)).fill()
+    guard hover else { return }
+    let a: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10, weight: .bold), .foregroundColor: NSColor(white: 0, alpha: 0.6)]
+    let t = NSAttributedString(string: symbol, attributes: a), sz = t.size()
+    t.draw(at: NSPoint(x: (bounds.width - sz.width) / 2, y: (bounds.height - sz.height) / 2))
+  }
+}
+
+/** The deck when minimized: a small 🎛 pill. Click to expand, drag to move. */
+final class PillView: NSView {
+  var onClick: (() -> Void)?
+  private var start: NSPoint?, moved = false
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+  override func draw(_ r: NSRect) {
+    NSColor(white: 0.02, alpha: 0.96).setFill()
+    NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
+    let t = NSAttributedString(string: "🎛", attributes: [.font: NSFont.systemFont(ofSize: 22)]), sz = t.size()
+    t.draw(at: NSPoint(x: (bounds.width - sz.width) / 2, y: (bounds.height - sz.height) / 2))
+  }
+  override func mouseDown(with e: NSEvent) { start = NSEvent.mouseLocation; moved = false }
+  override func mouseDragged(with e: NSEvent) {
+    guard let s = start, let w = window else { return }
+    let now = NSEvent.mouseLocation
+    w.setFrameOrigin(NSPoint(x: w.frame.origin.x + now.x - s.x, y: w.frame.origin.y + now.y - s.y))
+    start = now; moved = true
+  }
+  override func mouseUp(with e: NSEvent) { if !moved { onClick?() } }
+}
+
 // MARK: - Panel (drag it by the dark border)
 
 final class DeckPanel: NSPanel {
@@ -71,8 +118,10 @@ final class DeckPanel: NSPanel {
 }
 
 final class Background: NSView {
+  var pillMode = false
   override var mouseDownCanMoveWindow: Bool { true }
   override func draw(_ dirtyRect: NSRect) {
+    guard !pillMode else { return }
     NSColor(white: 0.02, alpha: 0.96).setFill()
     NSBezierPath(roundedRect: bounds, xRadius: 20, yRadius: 20).fill()
   }
@@ -149,6 +198,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var images: [Int: NSImage] = [:]
   let host = Host()
   var status: NSStatusItem!
+  var dims = (columns: 4, rows: 2)
+  var minimized = false
+  let pill = PillView(frame: NSRect(x: 0, y: 0, width: 56, height: 40))
+  lazy var buttons: [WindowButton] = [
+    WindowButton(color: NSColor(red: 1, green: 0.37, blue: 0.34, alpha: 1), symbol: "×") { [weak self] in self?.close() },
+    WindowButton(color: NSColor(red: 1, green: 0.74, blue: 0.18, alpha: 1), symbol: "−") { [weak self] in self?.minimize() },
+  ]
 
   func applicationDidFinishLaunching(_ n: Notification) {
     panel = DeckPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
@@ -163,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     panel.contentView = Background()
     layout(columns: 4, rows: 2)
     restorePosition()
+    pill.onClick = { [weak self] in self?.expand() }
     panel.orderFrontRegardless()
     NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in self?.savePosition() }
 
@@ -178,16 +235,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationWillTerminate(_ n: Notification) { host.stop() }
 
   func layout(columns: Int, rows: Int) {
+    dims = (columns, rows)
+    if minimized { return }  // applied when the deck is expanded again
     keys.forEach { $0.removeFromSuperview() }
     keys = []
     let w = pad * 2 + CGFloat(columns) * keySize + CGFloat(columns - 1) * gap
-    let h = pad * 2 + CGFloat(rows) * keySize + CGFloat(rows - 1) * gap
-    let origin = panel.frame.origin
-    panel.setFrame(NSRect(x: origin.x, y: origin.y + panel.frame.height - h, width: w, height: h), display: true)
+    let h = pad * 2 + bar + CGFloat(rows) * keySize + CGFloat(rows - 1) * gap
+    let top = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)  // grow/shrink downwards, top-left stays put
+    panel.setFrame(NSRect(x: top.x, y: top.y - h, width: w, height: h), display: true)
+    for (n, b) in buttons.enumerated() {
+      b.frame.origin = NSPoint(x: pad + CGFloat(n) * 19, y: h - pad + 2 - b.frame.height)
+      if b.superview == nil { panel.contentView?.addSubview(b) }
+    }
     for i in 0..<(columns * rows) {
       let k = KeyView(index: i)
       let c = i % columns, r = i / columns
-      k.frame.origin = NSPoint(x: pad + CGFloat(c) * (keySize + gap), y: h - pad - keySize - CGFloat(r) * (keySize + gap))
+      k.frame.origin = NSPoint(x: pad + CGFloat(c) * (keySize + gap), y: h - pad - bar - keySize - CGFloat(r) * (keySize + gap))
       k.onPress = { [weak self] i, down in self?.host.send(["t": down ? "down" : "up", "i": i]) }
       k.setImage(images[i])
       panel.contentView?.addSubview(k)
@@ -217,10 +280,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: position
   func savePosition() {
-    UserDefaults.standard.set(NSStringFromPoint(panel.frame.origin), forKey: "origin")
+    UserDefaults.standard.set(NSStringFromPoint(NSPoint(x: panel.frame.minX, y: panel.frame.maxY)), forKey: "topLeft")
   }
   func restorePosition() {
-    if let s = UserDefaults.standard.string(forKey: "origin") {
+    if let s = UserDefaults.standard.string(forKey: "topLeft") {
+      panel.setFrameTopLeftPoint(NSPointFromString(s))
+    } else if let s = UserDefaults.standard.string(forKey: "origin") {
       panel.setFrameOrigin(NSPointFromString(s))
     } else if let screen = NSScreen.main?.visibleFrame {
       panel.setFrameOrigin(NSPoint(x: screen.maxX - panel.frame.width - 24, y: screen.minY + 24))
@@ -244,6 +309,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     status.menu = menu
   }
   @objc func toggle() { panel.isVisible ? panel.orderOut(nil) : panel.orderFrontRegardless() }
+
+  /** Close = hide (⌃⌥⌘Space or the menu-bar icon brings it back); the app keeps running. */
+  func close() { panel.orderOut(nil) }
+
+  /** Minimize = shrink to a 🎛 pill at the same corner; click the pill to expand. */
+  func minimize() {
+    guard !minimized else { return }
+    minimized = true
+    panel.contentView?.subviews.forEach { $0.isHidden = true }
+    let top = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
+    panel.setFrame(NSRect(x: top.x, y: top.y - pill.frame.height, width: pill.frame.width, height: pill.frame.height), display: true)
+    pill.frame.origin = .zero
+    pill.isHidden = false
+    if pill.superview == nil { panel.contentView?.addSubview(pill) }
+    (panel.contentView as? Background)?.pillMode = true
+    panel.contentView?.needsDisplay = true
+  }
+
+  func expand() {
+    guard minimized else { return }
+    minimized = false
+    pill.isHidden = true
+    (panel.contentView as? Background)?.pillMode = false
+    panel.contentView?.subviews.forEach { if $0 !== pill { $0.isHidden = false } }
+    layout(columns: dims.columns, rows: dims.rows)
+    panel.contentView?.needsDisplay = true
+  }
   @objc func editKeys() { NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.config/sree-deck/deck.json")) }
   @objc func reload() { host.send(["t": "reload"]) }
   @objc func home() { host.send(["t": "home"]) }

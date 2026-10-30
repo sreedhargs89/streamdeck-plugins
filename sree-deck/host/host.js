@@ -197,7 +197,9 @@ async function builtin(k) {
     case "text": {
       // like Stream Deck's Text action: paste it (fast, any length), optionally press Enter; then put the clipboard back
       const before = await new Promise((r) => execFile("/usr/bin/pbpaste", (e, out) => r(e ? "" : out)));
-      await run("/usr/bin/pbcopy", [], c.text);
+      // "file": read the text at press time (e.g. ~/.claude/prompts/*.txt), so editing the file is enough, no reload
+      const text = c.file ? readFileSync(c.file.replace(/^~/, homedir()), "utf8").replace(/\s+$/, "") + "\n\n" : c.text;
+      await run("/usr/bin/pbcopy", [], text);
       await pressKeys("55+9"); // cmd+v
       if (c.enter) {
         await new Promise((r) => setTimeout(r, 250)); // let the app (Slack, Electron) take the paste before Enter
@@ -212,6 +214,12 @@ async function builtin(k) {
     case "keys":
       await pressKeys(...c.keys);
       return true;
+    case "arc": {
+      // switch Arc to a space (by its name in Arc's sidebar)
+      const name = String(c.space).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      await osa(`tell application "Arc"\n activate\n tell front window to tell space "${name}" to focus\nend tell`);
+      return true;
+    }
     case "volume":
       if (c.do === "mute") await osa("set volume output muted (not (output muted of (get volume settings)))");
       else await osa(`set volume output volume ((output volume of (get volume settings)) ${c.do === "down" ? "-" : "+"} 6)`);

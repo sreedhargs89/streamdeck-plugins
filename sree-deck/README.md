@@ -11,6 +11,8 @@ dictation on/off) look and behave exactly like on the hardware.
   with ◀ Back (long-press = close). Plugin keys in the drawer get willAppear/willDisappear like on a real deck.
 - **Hotkeys** press whatever key sits at that spot on the current page — row 1: ⌃⌥1 … ⌃⌥8, row 2: ⌃⌥Q … ⌃⌥I (main keys)
   (holding the hotkey holds the key, so hold-to-talk works from the keyboard).
+- 🔴 close hides the deck (⌃⌥⌘Space or the menu-bar brings it back); 🟡 minimize shrinks it to a 🎛 pill — click
+  the pill to expand, drag it to move.
 - Menu-bar 🎛: Show/Hide, Home, Edit Keys…, Reload, Launch at Login, Quit.
 
 ## How it works
@@ -35,6 +37,7 @@ Marketplace plugins (Spotify, Voicemod…) are tied to Elgato's app and aren't s
     { "type": "open", "app": "Ghostty" },
     { "type": "keys", "keys": ["58+18"] },
     { "type": "volume", "do": "up" },
+    { "type": "arc", "space": "it-ops-asahi" },
     { "type": "folder", "title": "Work", "icon": "icons/work.png", "keys": [ … ] }
   ]
 }
