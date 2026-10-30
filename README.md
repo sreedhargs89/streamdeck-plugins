@@ -8,6 +8,8 @@ Personal Elgato Stream Deck plugins (macOS, Stream Deck 7.1+, Node.js 24).
 | [`m365/`](m365/) | **M365 Live**: Next Meeting key, a countdown that changes colour as the meeting gets close; tap to join Teams/Zoom |
 | [`wispr/`](wispr/) | **Wispr Keys**: Wispr Flow dictation toggle, hold-to-talk (real Fn), Lens, Polish, Scratchpad and deep links |
 | [`sree-deck/`](sree-deck/) | **Sree Deck**: a floating 8-key Mac app that runs these same plugins like a real Stream Deck (⌃⌥⌘Space to show/hide) |
+| [`agents-bar/`](agents-bar/) | **Agents**: menu-bar 🔴/🔵/🟢 counts for herdr agents, notifications when one needs you or finishes, click to jump |
+| [`claude-commands/`](claude-commands/) | Generates Claude Code slash commands (`/reply`, `/ticket`, `/chrome`…) from the deck prompt files |
 | [`zen/`](zen/) | **Zen**: pomodoro sand clock, quick timer, breathing, affirmations, gratitude log with streak, water and stand reminders, dad jokes, break roulette, world clock, day hourglass |
 | [`audio/`](audio/) | **Audio**: one-tap output/input device switching and presets (SwitchAudioSource) |
 
