@@ -1,0 +1,12 @@
+{
+  "name": "streamdeck-arc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Arc Spaces — switch Arc to a space from a Stream Deck key",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "link": "ln -sfn \"$PWD/com.sree.arc.sdPlugin\" ~/Library/Application\\ Support/com.elgato.StreamDeck/Plugins/com.sree.arc.sdPlugin",
+    "reload": "pkill -f 'com.sree.arc.sdPlugin/bin' || true"
+  }
+}

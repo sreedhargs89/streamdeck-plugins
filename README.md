@@ -7,6 +7,7 @@ Personal Elgato Stream Deck plugins (macOS, Stream Deck 7.1+, Node.js 24).
 | [`herdr/`](herdr/) | **herdr Live**: live, self-syncing tiles for herdr tabs/agents with status dots, a "Needs me" key and paging |
 | [`m365/`](m365/) | **M365 Live**: Next Meeting key, a countdown that changes colour as the meeting gets close; tap to join Teams/Zoom |
 | [`wispr/`](wispr/) | **Wispr Keys**: Wispr Flow dictation toggle, hold-to-talk (real Fn), Lens, Polish, Scratchpad and deep links |
+| [`arc/`](arc/) | **Arc Spaces**: one key per Arc space; press to switch Arc to it (AppleScript). No dependencies. |
 | [`sree-deck/`](sree-deck/) | **Sree Deck**: a floating 8-key Mac app that runs these same plugins like a real Stream Deck (⌃⌥⌘Space to show/hide) |
 | [`agents-bar/`](agents-bar/) | **Agents**: menu-bar 🔴/🔵/🟢 counts for herdr agents, notifications when one needs you or finishes, click to jump |
 | [`claude-commands/`](claude-commands/) | Generates Claude Code slash commands (`/reply`, `/ticket`, `/chrome`…) from the deck prompt files |

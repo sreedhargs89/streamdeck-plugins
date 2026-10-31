@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.sree.arc",
+  "Name": "Arc Spaces",
+  "Version": "1.0.0.0",
+  "Author": "Sree",
+  "Description": "Switch Arc to a space from a key.",
+  "Category": "Arc Spaces",
+  "CategoryIcon": "imgs/category",
+  "Icon": "imgs/plugin",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Nodejs": { "Version": "24", "Debug": "disabled" },
+  "Software": { "MinimumVersion": "7.1" },
+  "OS": [{ "Platform": "mac", "MinimumVersion": "13" }],
+  "Actions": [
+    {
+      "UUID": "com.sree.arc.space",
+      "Name": "Arc Space",
+      "Tooltip": "Switches Arc to a space. Settings: space = the space's name in Arc's sidebar.",
+      "Icon": "imgs/space",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/space", "ShowTitle": false }]
+    }
+  ]
+}
